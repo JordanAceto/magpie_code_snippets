@@ -118,6 +118,9 @@ int main(void)
       continue;
     }
 
+    // without a brief delay between card init and mount, there are often mount errors
+    MXC_Delay(100000);
+
     if (sd_card_mount() != SD_CARD_ERROR_ALL_OK)
     {
       num_cards_with_mount_errors += 1;

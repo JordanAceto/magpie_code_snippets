@@ -37,6 +37,7 @@ static uint8_t dmaDestBuff[DMA_BUFF_LEN_IN_BYTES] = {0};
 static uint8_t bigDMAbuff[DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED] = {0};
 
 // the number of DMA_BUFF_LEN_IN_BYTES length buffers available to read, should usually just be 1, but can be up to
+// DMA_NUM_STALLS_ALLOWED without issues. If it exceeds DMA_NUM_STALLS_ALLOWED then this indicates an overrun
 static uint32_t num_buffers_available = 0;
 
 // true if we write more than DMA_NUM_STALLS_ALLOWED into the big DMA buffer

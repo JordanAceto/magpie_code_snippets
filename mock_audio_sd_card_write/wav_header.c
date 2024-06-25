@@ -43,12 +43,12 @@ typedef struct __attribute__((packed))
 static Wave_Header_t wave_header = {
     // Some attributes of the wave header never change. We set them once here, and then never update them again.
     // Other attributes (file length, sample rate, etc) do change dynamically via calls to wav_header_set_attributes(a)
-    .riff = "RIFF",
-    .wave = "WAVE",
-    .fmt_ = "fmt ",
+    .riff = {'R', 'I', 'F', 'F'},
+    .wave = {'W', 'A', 'V', 'E'},
+    .fmt_ = {'f', 'm', 't', ' '},
     .fmt_chunk_size = WAVE_HEADER_FMT_CHUNK_SIZE,
     .fmt_tag = WAVE_HEADER_FMT_TAG_PCM,
-    .data = "data",
+    .data = {'d', 'a', 't', 'a'},
 };
 
 const uint32_t HEADER_LENGTH = sizeof(wave_header);

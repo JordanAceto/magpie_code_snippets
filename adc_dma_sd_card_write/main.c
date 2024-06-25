@@ -48,7 +48,7 @@ static void error_handler(LED_Color_t c);
 
 int main(void)
 {
-	LED_On(LED_COLOR_RED);
+    LED_On(LED_COLOR_RED);
 
     if (sd_card_init() != SD_CARD_ERROR_ALL_OK)
     {
@@ -72,9 +72,9 @@ int main(void)
         error_handler(LED_COLOR_RED);
     }
 
-	LED_Off(LED_COLOR_RED);
+    LED_Off(LED_COLOR_RED);
 
-	LED_On(LED_COLOR_BLUE);
+    LED_On(LED_COLOR_BLUE);
 
     if (ad4630_init() != AD4630_ERROR_ALL_OK)
     {

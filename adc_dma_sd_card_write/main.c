@@ -63,7 +63,7 @@ int main(void)
     sprintf(str_buff, "test.wav");
     if (sd_card_fopen(str_buff, POSIX_FILE_MODE_WRITE) != SD_CARD_ERROR_ALL_OK)
     {
-        error_handler(LED_COLOR_BLUE);
+        error_handler(LED_COLOR_RED);
     }
 
     // seek past the wave header, we'll fill it in later at the end

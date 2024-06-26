@@ -13,15 +13,18 @@
 /* Private defines ---------------------------------------------------------------------------------------------------*/
 
 // 24 bit data from the ADC
-#define RAW_DATA_SIZE_IN_BYTES (3)
-#define RAW_DATA_SIZE_IN_BITS (RAW_DATA_SIZE_IN_BYTES * 8)
+#define DMA_SAMPLE_LEN_IN_BYTES (3)
+#define DMA_SAMPLE_LEN_IN_BITS (DMA_SAMPLE_LEN_IN_BYTES * 8)
 
 // 24-bit words (not bytes)
 #define DMA_BUFF_LEN_IN_SAMPS (8192)
-#define DMA_BUFF_LEN_IN_BYTES (RAW_DATA_SIZE_IN_BYTES * DMA_BUFF_LEN_IN_SAMPS)
+#define DMA_BUFF_LEN_IN_BYTES (DMA_SAMPLE_LEN_IN_BYTES * DMA_BUFF_LEN_IN_SAMPS)
 
 // the number of stalls we can tolerate when the SD card takes longer to write than usual, MUST be a power of 2
 #define DMA_NUM_STALLS_ALLOWED (16)
+
+// the threshold for triggering a DMA request
+#define DMA_SPI_RX_THRESHOLD (DMA_SAMPLE_LEN_IN_BYTES * 8)
 
 // the SPI bus to use to read audio samples from the ADC
 #define DATA_SPI_BUS (MXC_SPI1)
@@ -38,7 +41,7 @@ static uint8_t bigDMAbuff[DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED] = {0};
 
 // the number of DMA_BUFF_LEN_IN_BYTES length buffers available to read, should usually just be 1, but can be up to
 // DMA_NUM_STALLS_ALLOWED without issues. If it exceeds DMA_NUM_STALLS_ALLOWED then this indicates an overrun
-static uint32_t num_buffers_available = 0;
+static uint32_t num_buffer_chunks_with_data_to_be_consumed = 0;
 
 // true if we write more than DMA_NUM_STALLS_ALLOWED into the big DMA buffer
 static bool overrun_occured = false;
@@ -111,7 +114,7 @@ Audio_DMA_Error_t audio_dma_init()
         .reqwait_en = 0,
         .tosel = MXC_DMA_TIMEOUT_4_CLK,
         .pssel = MXC_DMA_PRESCALE_DISABLE,
-        .burst_size = RAW_DATA_SIZE_IN_BITS,
+        .burst_size = DMA_SAMPLE_LEN_IN_BITS,
     };
 
     if (MXC_DMA_ConfigChannel(dma_config, dma_transfer) != E_NO_ERROR)
@@ -157,7 +160,7 @@ Audio_DMA_Error_t audio_dma_start()
     }
 
     DATA_SPI_BUS->dma |= MXC_F_SPI_DMA_RX_FIFO_EN;
-    if (MXC_SPI_SetRXThreshold(DATA_SPI_BUS, 24) != E_NO_ERROR)
+    if (MXC_SPI_SetRXThreshold(DATA_SPI_BUS, DMA_SPI_RX_THRESHOLD) != E_NO_ERROR)
     {
         return AUDIO_DMA_ERROR_DMA_ERROR;
     }
@@ -172,6 +175,7 @@ Audio_DMA_Error_t audio_dma_start()
         first_read = gpio_read_pin(&adc_busy_pin);  // L
         second_read = gpio_read_pin(&adc_busy_pin); // H
         stall = (!second_read || first_read);
+        // TODO: there should be a timeout here in case we get stuck for any reason
     }
 
     DATA_SPI_BUS->ctrl0 |= MXC_F_SPI_CTRL0_EN;
@@ -203,7 +207,7 @@ uint32_t audio_dma_buff_len_in_bytes()
 
 uint32_t audio_dma_num_buffers_available()
 {
-    return num_buffers_available;
+    return num_buffer_chunks_with_data_to_be_consumed;
 }
 
 uint8_t *audio_dma_consume_buffer()
@@ -216,7 +220,7 @@ uint8_t *audio_dma_consume_buffer()
     blockPtrModulo = (blockPtrModulo + 1) & (DMA_NUM_STALLS_ALLOWED - 1);
     offset = blockPtrModulo * DMA_BUFF_LEN_IN_BYTES;
 
-    num_buffers_available -= 1;
+    num_buffer_chunks_with_data_to_be_consumed -= 1;
 
     return retval;
 }
@@ -246,7 +250,7 @@ void DMA0_IRQHandler()
     static uint32_t offsetDMA = 0;
 
     // switch endian-ness while copying
-    for (uint32_t i = 0; i < DMA_BUFF_LEN_IN_BYTES; i += RAW_DATA_SIZE_IN_BYTES)
+    for (uint32_t i = 0; i < DMA_BUFF_LEN_IN_BYTES; i += DMA_SAMPLE_LEN_IN_BYTES)
     {
         // it's good to read the memory from the bottom up, because the low memory
         // will be the first to be over-written with new samples
@@ -263,9 +267,9 @@ void DMA0_IRQHandler()
     static uint32_t dataBlocksDmaCount = 0;
     dataBlocksDmaCount += 1;
 
-    num_buffers_available += 1;
+    num_buffer_chunks_with_data_to_be_consumed += 1;
 
-    if (num_buffers_available > DMA_NUM_STALLS_ALLOWED)
+    if (num_buffer_chunks_with_data_to_be_consumed > DMA_NUM_STALLS_ALLOWED)
     {
         overrun_occured = true;
     }

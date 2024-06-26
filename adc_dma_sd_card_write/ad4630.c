@@ -410,12 +410,6 @@ AD4630_Error_t set_data_spi_to_slave_mode()
         return AD4630_ERROR_CONFIG_ERROR;
     }
 
-    // threshold of 24 bytes ( 8 samples of 3 bytes each) to trigger dma
-    if (MXC_SPI_SetRXThreshold(DATA_SPI_BUS, 23) != E_NO_ERROR)
-    {
-        return AD4630_ERROR_CONFIG_ERROR;
-    }
-
     // disable the port
     DATA_SPI_BUS->ctrl0 &= ~(MXC_F_SPI_CTRL0_EN);
 

@@ -7,7 +7,7 @@
 
 // This value depends on whether or not there is the extra 2 bytes after the bits_per_sample field and before "data"
 // If the extra two bytes are there, this must be 18, if not it must be 16
-#define WAVE_HEADER_FMT_CHUNK_SIZE (18)
+#define WAVE_HEADER_FMT_CHUNK_SIZE (16)
 
 // Always use PCM format for now. If we implement compression in the future this may change
 #define WAVE_HEADER_FMT_TAG_PCM (1)
@@ -32,7 +32,6 @@ typedef struct __attribute__((packed))
     uint32_t bytes_per_sec;    /* bytes per second = sample_rate * bytes_per_sample */
     uint16_t bytes_per_block;  /* num channels * bytes per sample */
     uint16_t bits_per_sample;  /* number of bits per sample */
-    uint16_t dummy;            /* with this here, the chunk size is 18, without it chunk size is 16 */
     char data[4];              /* always the string "data" */
     uint32_t data_length;      /* data length in bytes (file_length - the length of this struct) */
 } Wave_Header_t;

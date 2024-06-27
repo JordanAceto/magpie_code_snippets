@@ -13,6 +13,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* Public definitions ------------------------------------------------------------------------------------------------*/
+
+// 24 bit data from the ADC
+#define AUDIO_DMA_SAMPLE_LEN_IN_BYTES (3)
+#define AUDIO_DMA_SAMPLE_LEN_IN_BITS (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * 8)
+
+// 24-bit words (not bytes)
+#define AUDIO_DMA_BUFF_LEN_IN_SAMPS (8192)
+#define AUDIO_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * AUDIO_DMA_BUFF_LEN_IN_SAMPS)
+
+// 8192 samples at 384kHz take 21.33.. milliseconds to fill the buffer
+#define AUDIO_DMA_CHUNK_READY_PERIOD_IN_MICROSECS (21333)
+
 /* Public enumerations -----------------------------------------------------------------------------------------------*/
 
 /**
@@ -38,7 +51,7 @@ Audio_DMA_Error_t audio_dma_init();
 /**
  * @brief `audio_dma_start()` starts the audio DMA stream
  *
- * @pre DMA initialization is complete
+ * @pre DMA initialization is complete, the ADC is initialized and continuously converting
  *
  * @post the DMA stream is started and the internal buffers are continuously filled with audio data
  *
@@ -56,13 +69,6 @@ Audio_DMA_Error_t audio_dma_start();
  * @retval `AUDIO_DMA_ERROR_ALL_OK` if the operation succeeded, else an error code
  */
 Audio_DMA_Error_t audio_dma_stop();
-
-/**
- * `audio_dma_buff_len_in_bytes()` is the size of the DMA buffer, in bytes
- *
- * @retval the length of the buffer that will be yielded by `audio_dma_consume_buffer()`
- */
-uint32_t audio_dma_buff_len_in_bytes();
 
 /**
  * @brief `audio_dma_num_buffers_available()` is the number of full buffers available for reading

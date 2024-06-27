@@ -12,32 +12,25 @@
 
 /* Private defines ---------------------------------------------------------------------------------------------------*/
 
-// 24 bit data from the ADC
-#define DMA_SAMPLE_LEN_IN_BYTES (3)
-#define DMA_SAMPLE_LEN_IN_BITS (DMA_SAMPLE_LEN_IN_BYTES * 8)
-
-// 24-bit words (not bytes)
-#define DMA_BUFF_LEN_IN_SAMPS (8192)
-#define DMA_BUFF_LEN_IN_BYTES (DMA_SAMPLE_LEN_IN_BYTES * DMA_BUFF_LEN_IN_SAMPS)
-
 // the number of stalls we can tolerate when the SD card takes longer to write than usual, MUST be a power of 2
 #define DMA_NUM_STALLS_ALLOWED (16)
 
 // the threshold for triggering a DMA request
-#define DMA_SPI_RX_THRESHOLD (DMA_SAMPLE_LEN_IN_BYTES * 8)
+#define DMA_SPI_RX_THRESHOLD (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * 8)
 
 // the SPI bus to use to read audio samples from the ADC
 #define DATA_SPI_BUS (MXC_SPI1)
 
 /* Private variables -------------------------------------------------------------------------------------------------*/
 
-static int dma_channel;
+// the DMA channel to use, will be updated to a valid DMA channel during initialization
+static int dma_channel = E_BAD_STATE;
 
 // audio samples from the ADC are dumped here
-static uint8_t dmaDestBuff[DMA_BUFF_LEN_IN_BYTES] = {0};
+static uint8_t dmaDestBuff[AUDIO_DMA_BUFF_LEN_IN_BYTES] = {0};
 
 // the big DMA buff can tolerate a few long SD card writes that go over the available time
-static uint8_t bigDMAbuff[DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED] = {0};
+static uint8_t bigDMAbuff[AUDIO_DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED] = {0};
 
 // the number of DMA_BUFF_LEN_IN_BYTES length buffers available to read, should usually just be 1, but can be up to
 // DMA_NUM_STALLS_ALLOWED without issues. If it exceeds DMA_NUM_STALLS_ALLOWED then this indicates an overrun
@@ -96,7 +89,7 @@ Audio_DMA_Error_t audio_dma_init()
         .ch = dma_channel,
         .source = NULL,
         .dest = &dmaDestBuff[0],
-        .len = DMA_BUFF_LEN_IN_BYTES,
+        .len = AUDIO_DMA_BUFF_LEN_IN_BYTES,
     };
 
     mxc_dma_config_t dma_config = {
@@ -114,7 +107,7 @@ Audio_DMA_Error_t audio_dma_init()
         .reqwait_en = 0,
         .tosel = MXC_DMA_TIMEOUT_4_CLK,
         .pssel = MXC_DMA_PRESCALE_DISABLE,
-        .burst_size = DMA_SAMPLE_LEN_IN_BITS,
+        .burst_size = AUDIO_DMA_SAMPLE_LEN_IN_BITS,
     };
 
     if (MXC_DMA_ConfigChannel(dma_config, dma_transfer) != E_NO_ERROR)
@@ -200,11 +193,6 @@ Audio_DMA_Error_t audio_dma_stop()
     return AUDIO_DMA_ERROR_ALL_OK;
 }
 
-uint32_t audio_dma_buff_len_in_bytes()
-{
-    return DMA_BUFF_LEN_IN_BYTES;
-}
-
 uint32_t audio_dma_num_buffers_available()
 {
     return num_buffer_chunks_with_data_to_be_consumed;
@@ -218,7 +206,7 @@ uint8_t *audio_dma_consume_buffer()
     uint8_t *retval = bigDMAbuff + offset;
 
     blockPtrModulo = (blockPtrModulo + 1) & (DMA_NUM_STALLS_ALLOWED - 1);
-    offset = blockPtrModulo * DMA_BUFF_LEN_IN_BYTES;
+    offset = blockPtrModulo * AUDIO_DMA_BUFF_LEN_IN_BYTES;
 
     num_buffer_chunks_with_data_to_be_consumed -= 1;
 
@@ -250,7 +238,7 @@ void DMA0_IRQHandler()
     static uint32_t offsetDMA = 0;
 
     // switch endian-ness while copying
-    for (uint32_t i = 0; i < DMA_BUFF_LEN_IN_BYTES; i += DMA_SAMPLE_LEN_IN_BYTES)
+    for (uint32_t i = 0; i < AUDIO_DMA_BUFF_LEN_IN_BYTES; i += AUDIO_DMA_SAMPLE_LEN_IN_BYTES)
     {
         // it's good to read the memory from the bottom up, because the low memory
         // will be the first to be over-written with new samples
@@ -262,10 +250,7 @@ void DMA0_IRQHandler()
     static uint32_t blockPtrModuloDMA = 0;
 
     blockPtrModuloDMA = (blockPtrModuloDMA + 1) & (DMA_NUM_STALLS_ALLOWED - 1);
-    offsetDMA = blockPtrModuloDMA * DMA_BUFF_LEN_IN_BYTES;
-
-    static uint32_t dataBlocksDmaCount = 0;
-    dataBlocksDmaCount += 1;
+    offsetDMA = blockPtrModuloDMA * AUDIO_DMA_BUFF_LEN_IN_BYTES;
 
     num_buffer_chunks_with_data_to_be_consumed += 1;
 

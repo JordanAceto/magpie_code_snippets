@@ -16,20 +16,19 @@ Universal instructions on building, flashing, and debugging this project can be 
 ## Required Connections
 
 - This demo requires the FTHR2 to be installed in the custom Magpie hardware stack with AFE board installed
-- Set FTHR2 jumper J4 to the 1.8v position to tie the I2C pullups to 1.8v 
+- Set FTHR2 jumper J4 to the 1.8v position to tie the I2C pullups to 1.8v (required by the motherboard, I2C is not used in this demo)
 - Insert an SD card into the FTHR2 slot (format the SD card to exFAT prior to inserting)
 - Connect a USB cable between the PC and the FTHR2 to power the boards
 
 ## Expected Output
 
-The demo attempts to write a short audio file to the root of the SD card file system. LEDs indicate the state of the system.
+The demo attempts to write a short audio files to the root of the SD card file system. LEDs indicate the state of the system.
 
 During execution the LEDs show which stage we are on
 
-- Red LED while initializing, mounting, and opening the file on the SD card
-- Blue while initializing and starting the ADC and DMA
+- Blue while initializing the system
 - Green while recording audio
-- Note that some stages may finish very quickly, so you may not see the LEDs on during initialization and setup
+- Note that some stages may finish very quickly, so you may not see the LEDs on during initialization
 
 If there is a problem then one of the onboard FTHR2 LEDs rapidly blink forever as a primitive error handler
 
@@ -39,5 +38,11 @@ If there is a problem then one of the onboard FTHR2 LEDs rapidly blink forever a
 
 At the end a slow Green LED blink indicates that all operations were successful
 
-After execution is complete a WAVE file will be created at the root of the SD card file system. You can listen to this
-file with an audio player and inspect the contents with a text editor able to view files as raw hex.
+After execution is complete a few WAVE files will be created at the root of the SD card file system. You can listen to these
+files with an audio player and inspect the contents with a text editor able to view files as raw hex.
+
+## Quirks/limitations
+- Not all sample rates are handled yet
+- Of the sample rates that are handled, the FIR coefficients for 192kHz and 96kHz may not be where we want them
+- Occasionally we get a __really__ noisy file, this is probably the bytes of the audio getting out of order, needs investigation, this one is very important to fix
+- I have observed it triggering the error handler on occasion, likely from a DMA overrun, investigation is required

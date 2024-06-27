@@ -147,6 +147,8 @@ Audio_DMA_Error_t audio_dma_init()
 
 Audio_DMA_Error_t audio_dma_start()
 {
+	MXC_SPI_ClearRXFIFO(DATA_SPI_BUS);
+
     if (MXC_DMA_EnableInt(dma_channel) != E_NO_ERROR)
     {
         return AUDIO_DMA_ERROR_DMA_ERROR;

@@ -1,6 +1,6 @@
 ## Description
 
-- This demo reads audio samples from the ADC at 384kHz and writes a .wav file to the SD card
+- This demo reads audio samples from the ADC at 384kHz and writes .wav files with various sample rates and bit depths to the SD card
 - It runs on a MAX32666 FTHR2 board
 
 ## Software
@@ -19,6 +19,11 @@ Universal instructions on building, flashing, and debugging this project can be 
 - Set FTHR2 jumper J4 to the 1.8v position to tie the I2C pullups to 1.8v (required by the motherboard, I2C is not used in this demo)
 - Insert an SD card into the FTHR2 slot (format the SD card to exFAT prior to inserting)
 - Connect a USB cable between the PC and the FTHR2 to power the boards
+
+### Note about FTHR2
+- The FTHR2 is used because the SD card slot is in the front, where the original FTHR has it in the back
+    - This way you can take the SD card in and out without removing the FTHR from the Motherboard stack
+- The FTHR2 hits the AFE board with normal length headers, we made extra long headers so the FTHR2 can clear the AFE
 
 ## Expected Output
 

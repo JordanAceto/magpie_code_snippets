@@ -11,6 +11,7 @@
 #include "audio_dma.h"
 #include "decimation_filter.h"
 #include "demo_config.h"
+#include "gpio_helpers.h"
 #include "sd_card.h"
 #include "wav_header.h"
 
@@ -65,6 +66,8 @@ int main(void)
 {
     // blue led on during initialization
     LED_On(LED_COLOR_BLUE);
+
+    gpio_profiling_pin_init();
 
     decimation_filter_init();
 

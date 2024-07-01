@@ -1,4 +1,19 @@
+/* Private includes --------------------------------------------------------------------------------------------------*/
+
 #include "gpio_helpers.h"
+
+/* Private variables -------------------------------------------------------------------------------------------------*/
+
+static const mxc_gpio_cfg_t profiling_pin = {
+    .port = MXC_GPIO1,
+    .mask = MXC_GPIO_PIN_8,
+    .pad = MXC_GPIO_PAD_NONE,
+    .func = MXC_GPIO_FUNC_OUT,
+    .vssel = MXC_GPIO_VSSEL_VDDIO,
+    .drvstr = MXC_GPIO_DRVSTR_0,
+};
+
+/* Public function definitions ---------------------------------------------------------------------------------------*/
 
 void gpio_write_pin(const mxc_gpio_cfg_t *pin, bool state)
 {
@@ -13,4 +28,14 @@ void gpio_toggle_pin(const mxc_gpio_cfg_t *pin)
 bool gpio_read_pin(const mxc_gpio_cfg_t *pin)
 {
     return (bool)MXC_GPIO_InGet(pin->port, pin->mask);
+}
+
+void gpio_profiling_pin_init()
+{
+    MXC_GPIO_Config(&profiling_pin);
+}
+
+void gpio_profiling_pin_write(bool state)
+{
+    gpio_write_pin(&profiling_pin, state);
 }

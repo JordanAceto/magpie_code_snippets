@@ -1,6 +1,8 @@
 /* Private includes --------------------------------------------------------------------------------------------------*/
 
+#include "arm_math.h"
 #include "audio_dma.h"
+#include "data_converters.h"
 #include "dma.h"
 #include "dma_regs.h"
 #include "gpio_helpers.h"
@@ -14,6 +16,18 @@
 
 // the number of stalls we can tolerate when the SD card takes longer to write than usual, MUST be a power of 2
 #define DMA_NUM_STALLS_ALLOWED (16)
+
+// the length of the big DMA buffer with spare room for tolerating SD card write stalls
+#define AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED)
+
+// halt compilation if the buffer lengths are not a multiple of 12,
+// this would mean that we can't fit an even number of samples into the buffer
+#if (AUDIO_DMA_BUFF_LEN_IN_BYTES % DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES)
+#error "Main audio DMA buffer length must be a multiple of 12 bytes"
+#endif
+#if (AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES % DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES)
+#error "Big audio DMA buffer length must be a multiple of 12 bytes"
+#endif
 
 // the threshold for triggering a DMA request
 #define DMA_SPI_RX_THRESHOLD (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * 8)
@@ -30,7 +44,7 @@ static int dma_channel = E_BAD_STATE;
 static uint8_t dmaDestBuff[AUDIO_DMA_BUFF_LEN_IN_BYTES] = {0};
 
 // the big DMA buff can tolerate a few long SD card writes that go over the available time
-static uint8_t bigDMAbuff[AUDIO_DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED] = {0};
+static uint8_t bigDMAbuff[AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES] = {0};
 
 // the number of DMA_BUFF_LEN_IN_BYTES length buffers available to read, should usually just be 1, but can be up to
 // DMA_NUM_STALLS_ALLOWED without issues. If it exceeds DMA_NUM_STALLS_ALLOWED then this indicates an overrun
@@ -147,7 +161,7 @@ Audio_DMA_Error_t audio_dma_init()
 
 Audio_DMA_Error_t audio_dma_start()
 {
-	MXC_SPI_ClearRXFIFO(DATA_SPI_BUS);
+    MXC_SPI_ClearRXFIFO(DATA_SPI_BUS);
 
     if (MXC_DMA_EnableInt(dma_channel) != E_NO_ERROR)
     {
@@ -239,15 +253,8 @@ void DMA0_IRQHandler()
 
     static uint32_t offsetDMA = 0;
 
-    // switch endian-ness while copying
-    for (uint32_t i = 0; i < AUDIO_DMA_BUFF_LEN_IN_BYTES; i += AUDIO_DMA_SAMPLE_LEN_IN_BYTES)
-    {
-        // it's good to read the memory from the bottom up, because the low memory
-        // will be the first to be over-written with new samples
-        bigDMAbuff[i + 2 + offsetDMA] = dmaDestBuff[i];     // ms byte
-        bigDMAbuff[i + 1 + offsetDMA] = dmaDestBuff[i + 1]; // mid byte
-        bigDMAbuff[i + offsetDMA] = dmaDestBuff[i + 2];     // ls byte
-    }
+    // switch endian-ness while copying into the big DMA buffer
+    data_converters_i24_swap_endianness(dmaDestBuff, bigDMAbuff + offsetDMA, AUDIO_DMA_BUFF_LEN_IN_BYTES);
 
     static uint32_t blockPtrModuloDMA = 0;
 

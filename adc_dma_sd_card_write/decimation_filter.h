@@ -31,7 +31,7 @@ void decimation_filter_init();
  * @param src_384kHz_24_bit the source buffer to downsample. It is expected that this is the 384kHz 24 bit buffer filled
  * with samples from the ADC via DMA.
  *
- * @param source_len_in_bytes the length of the source buffer, expected to be the DMA buffer length defined by the DMA
+ * @param src_len_in_bytes the length of the source buffer, expected to be the DMA buffer length defined by the DMA
  *
  * @param dest the destination buffer for the downsampled data. Must be long enough to hold the downsampled data.
  *
@@ -46,7 +46,7 @@ void decimation_filter_init();
  */
 uint32_t decimation_filter_downsample(
     uint8_t *src_384kHz_24_bit,
-    uint32_t source_len_in_bytes,
+    uint32_t src_len_in_bytes,
     uint8_t *dest,
     Wave_Header_Sample_Rate_t dest_sample_rate,
     Wave_Header_Bits_Per_Sample_t dest_bit_depth);

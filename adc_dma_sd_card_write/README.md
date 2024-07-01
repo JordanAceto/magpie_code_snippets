@@ -49,5 +49,4 @@ files with an audio player and inspect the contents with a text editor able to v
 ## Quirks/limitations
 - Not all sample rates are handled yet
 - Of the sample rates that are handled, the FIR coefficients for 192kHz and 96kHz may not be where we want them
-- Occasionally we get a __really__ noisy file, this is probably the bytes of the audio getting out of order, needs investigation, this one is very important to fix
 - I have observed it triggering the error handler on occasion, likely from a DMA overrun, investigation is required

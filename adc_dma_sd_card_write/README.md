@@ -2,6 +2,7 @@
 
 - This demo reads audio samples from the ADC at 384kHz and writes .wav files with various sample rates and bit depths to the SD card
 - It runs on a MAX32666 FTHR2 board
+- In this directory is also the start of a unit testing framework in `./test/unit_tests/`, this is very much an early-days work in progress
 
 ## Software
 

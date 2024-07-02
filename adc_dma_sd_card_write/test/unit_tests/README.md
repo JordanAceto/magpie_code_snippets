@@ -9,7 +9,47 @@
 
 ## Setup/installation
 
-- TODO, I have this set up on a Windows machine using Cygwin, I'll try to add some setup instructions soon
+### Windows
+
+#### Setup step (1) Install [Cygwin](https://www.cygwin.com/) by downloading and running the installer.
+
+Follow the instructions below (taken from [Klein embedded](https://kleinembedded.com/unit-testing-in-stm32cubeide-with-googletest/)):
+
+When you get to the Select Packages page during installation, select Full in the View dropdown menu to show all packages. Then select the following packages for installation by selecting the latest version in the dropdown menu where it says “Skip”:
+
+- gcc-code
+- gcc-g++
+- gdb (choose v9.2-1, newer versions do not work with Eclipse)
+- binutils
+- make
+- cmake
+- python3
+
+
+#### Setup step (2) Install Google Test
+
+Download the newest release of GoogleTest (v. 1.14.0 at the moment of writing this) from the [Github repository](https://github.com/google/googletest). Unpack the zip-archive. Then open a Cygwin Terminal, browse to the download location and compile the library, e.g.:
+```
+$ cd /cygdrive/c/Users/YourName/Downloads/googletest-release-1.14.0
+$ mkdir build && cd build
+$ cmake ..
+$ make
+```
+
+If everything goes smoothly, the library files should now be located in the lib folder within the current working directory, while the header files are located in the googletest/include and googlemock/include folders in the parent directory.
+
+To install both header and library files to the Cygwin directory (i.e. `C:\cygwin\usr\local\include` and `C:\cygwin\usr\local\lib`), also run:
+```
+$ make install
+```
+
+If the compiler complains that it can't find `-lgtest`, `-lgtest_main` or `-lgmock`, copy/move the libraries from `C:\cygwin\usr\local\lib` to `C\cygwin\usr\your-pc-architecture\lib`.
+
+The library files to move are `libgmock.a`, `libgmock_main.a`, `libgtest.a`, and `libgtest_main.a`.
+
+### MacOS/Linux
+
+- If anyone on the team is using Mac or Linux to run the unit tests, please fill in this section!
 
 ## Quirks/limitations
 

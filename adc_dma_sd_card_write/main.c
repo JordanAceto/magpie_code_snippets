@@ -34,19 +34,37 @@ typedef enum
 // a variable to store the number of bytes written to the SD card, can be checked against the intended amount
 static uint32_t bytes_written;
 
+// a string buffer to write file names into
+static char file_name_buff[128];
+
 // a buffer for downsampled audio
 static uint8_t downsampled_audio[AUDIO_DMA_BUFF_LEN_IN_BYTES];
+
+static const uint32_t num_sample_rates_to_test = 5;
+static const Wave_Header_Sample_Rate_t sample_rates[] = {
+    WAVE_HEADER_SAMPLE_RATE_16kHz,
+    WAVE_HEADER_SAMPLE_RATE_24kHz,
+    WAVE_HEADER_SAMPLE_RATE_32kHz,
+    WAVE_HEADER_SAMPLE_RATE_48kHz,
+    WAVE_HEADER_SAMPLE_RATE_96kHz,
+    // WAVE_HEADER_SAMPLE_RATE_192kHz, // TODO: 192kHz doesn't work yet, it takes too long
+    // WAVE_HEADER_SAMPLE_RATE_384kHz, // TODO: 383kHz only works at 24 bit for now
+};
+
+static const uint32_t num_bit_depths_to_test = 2;
+static const Wave_Header_Bits_Per_Sample_t bit_depths[] = {
+    WAVE_HEADER_16_BITS_PER_SAMPLE,
+    WAVE_HEADER_24_BITS_PER_SAMPLE,
+};
 
 /* Private function declarations -------------------------------------------------------------------------------------*/
 
 /**
- * @brief `write_demo_wav_file(f, a, l)` writes a wav file with filename `f`, attributes `a`, and length in seconds `l`
- * to the SD card. Calling this function starts the ADC/DMA and continuously records audio in blocking fashion until
- * the time is up.
+ * @brief `write_demo_wav_file(a, l)` writes a wav file with attributes `a`, and length in seconds `l`, with a name
+ * derived from the attributes. Calling this function starts the ADC/DMA and continuously records audio in blocking
+ * fashion until the time is up.
  *
  * @pre initialization is complete for the ADC, DMA, decimation filters, and SD card, the SD card must be mounted
- *
- * @param fname the name of the file to write
  *
  * @param wav_attr pointer to the wav header attributes structure holding information about sample rate, bit depth, etc
  *
@@ -55,7 +73,7 @@ static uint8_t downsampled_audio[AUDIO_DMA_BUFF_LEN_IN_BYTES];
  * @post this function consumes buffers from the ADC/DMA until the duration of the file length has elapsed and writes
  * the audio data out to a .wav file on the SD card. The wav header for the file is also written in this function.
  */
-static void write_demo_wav_file(const char *fname, Wave_Header_Attributes_t *wav_attr, uint32_t file_len_secs);
+static void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_secs);
 
 // the error handler simply rapidly blinks the given LED color forever
 static void error_handler(LED_Color_t c);
@@ -96,60 +114,19 @@ int main(void)
 
     LED_Off(LED_COLOR_BLUE);
 
-    // green led on while writing files
-    LED_On(LED_COLOR_GREEN);
-    wav_attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_48kHz;
-    wav_attr.bits_per_sample = WAVE_HEADER_16_BITS_PER_SAMPLE,
-    write_demo_wav_file("demo_48kHz_16_bit.wav", &wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
-    LED_Off(LED_COLOR_GREEN);
+    for (uint32_t sr = 0; sr < num_sample_rates_to_test; sr++)
+    {
+        for (uint32_t bd = 0; bd < num_bit_depths_to_test; bd++)
+        {
+            LED_On(LED_COLOR_GREEN);
+            wav_attr.sample_rate = sample_rates[sr];
+            wav_attr.bits_per_sample = bit_depths[bd];
+            write_demo_wav_file(&wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
+            LED_Off(LED_COLOR_GREEN);
 
-    MXC_Delay(1000000);
-
-    LED_On(LED_COLOR_GREEN);
-    wav_attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_96kHz;
-    wav_attr.bits_per_sample = WAVE_HEADER_16_BITS_PER_SAMPLE,
-    write_demo_wav_file("demo_96kHz_16_bit.wav", &wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
-    LED_Off(LED_COLOR_GREEN);
-
-    MXC_Delay(1000000);
-
-    LED_On(LED_COLOR_GREEN);
-    wav_attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_192kHz;
-    wav_attr.bits_per_sample = WAVE_HEADER_16_BITS_PER_SAMPLE,
-    write_demo_wav_file("demo_192kHz_16_bit.wav", &wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
-    LED_Off(LED_COLOR_GREEN);
-
-    MXC_Delay(1000000);
-
-    LED_On(LED_COLOR_GREEN);
-    wav_attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_48kHz;
-    wav_attr.bits_per_sample = WAVE_HEADER_24_BITS_PER_SAMPLE,
-    write_demo_wav_file("demo_48kHz_24_bit.wav", &wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
-    LED_Off(LED_COLOR_GREEN);
-
-    MXC_Delay(1000000);
-
-    LED_On(LED_COLOR_GREEN);
-    wav_attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_96kHz;
-    wav_attr.bits_per_sample = WAVE_HEADER_24_BITS_PER_SAMPLE,
-    write_demo_wav_file("demo_96kHz_24_bit.wav", &wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
-    LED_Off(LED_COLOR_GREEN);
-
-    MXC_Delay(1000000);
-
-    LED_On(LED_COLOR_GREEN);
-    wav_attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_192kHz;
-    wav_attr.bits_per_sample = WAVE_HEADER_24_BITS_PER_SAMPLE,
-    write_demo_wav_file("demo_192kHz_24_bit.wav", &wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
-    LED_Off(LED_COLOR_GREEN);
-
-    MXC_Delay(1000000);
-
-    LED_On(LED_COLOR_GREEN);
-    wav_attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_384kHz;
-    wav_attr.bits_per_sample = WAVE_HEADER_24_BITS_PER_SAMPLE,
-    write_demo_wav_file("demo_384kHz_24_bit.wav", &wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
-    LED_Off(LED_COLOR_GREEN);
+            MXC_Delay(500000);
+        }
+    }
 
     if (sd_card_unmount() != SD_CARD_ERROR_ALL_OK)
     {
@@ -169,13 +146,16 @@ int main(void)
 
 /* Private function definitions --------------------------------------------------------------------------------------*/
 
-void write_demo_wav_file(const char *fname, Wave_Header_Attributes_t *wav_attr, uint32_t file_len_secs)
+void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_secs)
 {
     // there will be some integer truncation here, good enough for this early demo, but improve file-len code eventually
     const uint32_t file_len_in_microsecs = file_len_secs * 1000000;
     const uint32_t num_dma_blocks_in_the_file = file_len_in_microsecs / AUDIO_DMA_CHUNK_READY_PERIOD_IN_MICROSECS;
 
-    if (sd_card_fopen(fname, POSIX_FILE_MODE_WRITE) != SD_CARD_ERROR_ALL_OK)
+    // derive the file name from the input parameters
+    sprintf(file_name_buff, "demo_%dkHz_%d_bit.wav", wav_attr->sample_rate / 1000, wav_attr->bits_per_sample);
+
+    if (sd_card_fopen(file_name_buff, POSIX_FILE_MODE_WRITE) != SD_CARD_ERROR_ALL_OK)
     {
         error_handler(LED_COLOR_RED);
     }

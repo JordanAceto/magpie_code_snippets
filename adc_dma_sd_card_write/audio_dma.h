@@ -23,8 +23,8 @@
 #define AUDIO_DMA_BUFF_LEN_IN_SAMPS (8256)
 #define AUDIO_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * AUDIO_DMA_BUFF_LEN_IN_SAMPS)
 
-// 8192 samples at 384kHz take 21.33.. milliseconds to fill the buffer
-#define AUDIO_DMA_CHUNK_READY_PERIOD_IN_MICROSECS (21333)
+// 8192 samples at 384kHz take 21.5 milliseconds to fill the buffer
+#define AUDIO_DMA_CHUNK_READY_PERIOD_IN_MICROSECS (21500)
 
 /* Public enumerations -----------------------------------------------------------------------------------------------*/
 

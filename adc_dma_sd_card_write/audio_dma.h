@@ -19,8 +19,8 @@
 #define AUDIO_DMA_SAMPLE_LEN_IN_BYTES (3)
 #define AUDIO_DMA_SAMPLE_LEN_IN_BITS (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * 8)
 
-// 24-bit words (not bytes)
-#define AUDIO_DMA_BUFF_LEN_IN_SAMPS (8192)
+// 24-bit words (not bytes), note this is divisible by 2, 4, 8, 12, 16, and 24 to support all desired sample-rates
+#define AUDIO_DMA_BUFF_LEN_IN_SAMPS (8256)
 #define AUDIO_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * AUDIO_DMA_BUFF_LEN_IN_SAMPS)
 
 // 8192 samples at 384kHz take 21.33.. milliseconds to fill the buffer

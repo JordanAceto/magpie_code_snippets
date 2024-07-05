@@ -15,17 +15,19 @@
 /* Private defines ---------------------------------------------------------------------------------------------------*/
 
 // the number of stalls we can tolerate when the SD card takes longer to write than usual, MUST be a power of 2
-#define DMA_NUM_STALLS_ALLOWED (16)
+#define DMA_NUM_STALLS_ALLOWED (4)
 
 // the length of the big DMA buffer with spare room for tolerating SD card write stalls
 #define AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED)
 
-// halt compilation if the buffer lengths are not a multiple of 12,
-// this would mean that we can't fit an even number of samples into the buffer
-#if (AUDIO_DMA_BUFF_LEN_IN_BYTES % DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES)
-#error "Main audio DMA buffer length must be a multiple of 12 bytes"
+// halt compilation if the buffer lengths do not conform to the necessary multiplicity, this is so an even number of
+// samples can fit in the buffers for all sample rates
+#define AUDIO_DMA_MAIN_BUFFER_LEN_MANDATORY_LCM (48)
+#if (AUDIO_DMA_BUFF_LEN_IN_SAMPS & AUDIO_DMA_MAIN_BUFFER_LEN_MANDATORY_LCM)
+#error "Main audio DMA buffer length must be divisible by 2, 4, 8, 12, 16, and 24"
 #endif
-#if (AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES % DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES)
+// this check ensures that we can fit an even number of 3-byte samples into the DMA buffer
+#if (AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES % DATA_CONVERTERS_I24_SMALLEST_VALID_CHUNK_SIZE)
 #error "Big audio DMA buffer length must be a multiple of 12 bytes"
 #endif
 

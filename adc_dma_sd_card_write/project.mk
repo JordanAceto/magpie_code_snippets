@@ -23,3 +23,5 @@ FATFS_VERSION = ff15
 LIB_CMSIS_DSP = 1
 
 MXC_OPTIMIZE_CFLAGS = -O2
+
+PROJ_LDFLAGS += -Wl,--print-memory-usage

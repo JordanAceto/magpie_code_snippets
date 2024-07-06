@@ -64,10 +64,6 @@
 
 /* Private variables -------------------------------------------------------------------------------------------------*/
 
-static q31_t dmaDestBuff_32bit[AUDIO_DMA_BUFF_LEN_IN_SAMPS] = {0}; // same data but assembled back into 32-bit words
-
-// static uint8_t *output_buffer[AUDIO_DMA_BUFF_LEN_IN_BYTES];
-
 // 16 k
 static const q31_t firCoeffs_16k_0[deci_16k_numcoeffs_0] = {
     86385383, 380767973, 588547483, 380767973, 86385383};
@@ -114,42 +110,12 @@ static const q31_t firCoeffs_96k_1[deci_96k_numcoeffs_1] = {
 static const q31_t firCoeffs_192k_0[deci_192k_numcoeffs_0] = {
     -21932835, -31283673, 20226235, 65093442, -23389170, -137747312, 30271796, 477147941, 730493753, 477147941, 30271796, -137747312, -23389170, 65093442, 20226235, -31283673, -21932835};
 
-// decimated buffers for various stages of the multi-rate filters
-static q31_t dma_rx_deci_2x[buffLen_deci2x] = {0};   // 1st 2X decimator output -> 192k
-static q31_t dma_rx_deci_4x[buffLen_deci4x] = {0};   // 2nd 2X decimator -> 96k
-static q31_t dma_rx_deci_8x[buffLen_deci8x] = {0};   // 3rd 2X decimator -> 48k
-static q31_t dma_rx_deci_12x[buffLen_deci12x] = {0}; // 3rd 3X decimator, 32k mode
-static q31_t dma_rx_deci_16x[buffLen_deci16x] = {0}; // 4th 2X decimator -> 24k
-static q31_t dma_rx_deci_24x[buffLen_deci24x] = {0}; // 4th 3X decimator, 16k mode
+// decimated buffers for various stages of the multi-rate filters, reused in a ping-pong fashion to save SRAM
+static q31_t rx_ping_pong_buff_0[buffLen_deci2x]; // guaranteed to be big enough for the first round of any sample rate
+static q31_t rx_ping_pong_buff_1[buffLen_deci4x]; // guaranteed to be big enough for the second round of any sample rate
 
-// 16 k
-static q31_t firState_16k_0[deci_state_len_16k_0] = {0};
-static q31_t firState_16k_1[deci_state_len_16k_1] = {0};
-static q31_t firState_16k_2[deci_state_len_16k_2] = {0};
-static q31_t firState_16k_3[deci_state_len_16k_3] = {0};
-
-// 24 k
-static q31_t firState_24k_0[deci_state_len_24k_0] = {0};
-static q31_t firState_24k_1[deci_state_len_24k_1] = {0};
-static q31_t firState_24k_2[deci_state_len_24k_2] = {0};
-static q31_t firState_24k_3[deci_state_len_24k_3] = {0};
-
-// 32 k
-static q31_t firState_32k_0[deci_state_len_32k_0] = {0};
-static q31_t firState_32k_1[deci_state_len_32k_1] = {0};
-static q31_t firState_32k_2[deci_state_len_32k_2] = {0};
-
-// 48 k
-static q31_t firState_48k_0[deci_state_len_48k_0] = {0};
-static q31_t firState_48k_1[deci_state_len_48k_1] = {0};
-static q31_t firState_48k_2[deci_state_len_48k_2] = {0};
-
-// 96 k
-static q31_t firState_96k_0[deci_state_len_96k_0] = {0};
-static q31_t firState_96k_1[deci_state_len_96k_1] = {0};
-
-// 192 k
-static q31_t firState_192k_0[deci_state_len_192k_0] = {0};
+static q31_t fir_state_pin_pong_0[deci_state_len_192k_0]; // guaranteed to be big enough for the first round of any sample rate
+static q31_t fir_state_pin_pong_1[deci_state_len_96k_1];  // guaranteed to be big enough for the second round of any sample rate
 
 // 16 k
 arm_fir_decimate_instance_q31 Sdeci_16k_0;
@@ -182,131 +148,161 @@ arm_fir_decimate_instance_q31 Sdeci_192k_0;
 
 /* Private function declarations -------------------------------------------------------------------------------------*/
 
-uint32_t truncate_bit_depth(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps, Wave_Header_Bits_Per_Sample_t bit_depth);
+/**
+ * @brief `truncate_bit_depth_from_q31(s, d, sl, bd)` truncates the 32 bit samples in buffer `s` to either 16 or 24 bits
+ * depending on bit depth `bd` and stores them in destination buffer `d`
+ *
+ * @param src the source buffer to truncate
+ *
+ * @param dest the destination for the truncated samples
+ *
+ * @param src_len_in_samps the number of samples to transfer, must obey the following preconditions:
+ * if bit_depth is 16 bits: can be any length,
+ * if bit_depth is 24 bits: must be a multiple of 4
+ *
+ * @param bit_depth the enumerated bit depth to truncate to, either 16 or 24 bits
+ *
+ * @post the samples from `s` are truncated and stored in `d`
+ */
+uint32_t truncate_bit_depth_from_q31(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps, Wave_Header_Bits_Per_Sample_t bit_depth);
 
 /* Public function definitions ---------------------------------------------------------------------------------------*/
 
 void decimation_filter_init()
 {
-    arm_fir_decimate_init_q31(&Sdeci_16k_0, deci_16k_numcoeffs_0, 2, &firCoeffs_16k_0[0], &firState_16k_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-    arm_fir_decimate_init_q31(&Sdeci_16k_1, deci_16k_numcoeffs_1, 2, &firCoeffs_16k_1[0], &firState_16k_1[0], buffLen_deci2x);
-    arm_fir_decimate_init_q31(&Sdeci_16k_2, deci_16k_numcoeffs_2, 2, &firCoeffs_16k_2[0], &firState_16k_2[0], buffLen_deci4x);
-    arm_fir_decimate_init_q31(&Sdeci_16k_3, deci_16k_numcoeffs_3, 3, &firCoeffs_16k_3[0], &firState_16k_3[0], buffLen_deci8x);
+    arm_fir_decimate_init_q31(&Sdeci_16k_0, deci_16k_numcoeffs_0, 2, &firCoeffs_16k_0[0], &fir_state_pin_pong_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+    arm_fir_decimate_init_q31(&Sdeci_16k_1, deci_16k_numcoeffs_1, 2, &firCoeffs_16k_1[0], &fir_state_pin_pong_1[0], buffLen_deci2x);
+    arm_fir_decimate_init_q31(&Sdeci_16k_2, deci_16k_numcoeffs_2, 2, &firCoeffs_16k_2[0], &fir_state_pin_pong_0[0], buffLen_deci4x);
+    arm_fir_decimate_init_q31(&Sdeci_16k_3, deci_16k_numcoeffs_3, 3, &firCoeffs_16k_3[0], &fir_state_pin_pong_1[0], buffLen_deci8x);
 
-    arm_fir_decimate_init_q31(&Sdeci_24k_0, deci_24k_numcoeffs_0, 2, &firCoeffs_24k_0[0], &firState_24k_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-    arm_fir_decimate_init_q31(&Sdeci_24k_1, deci_24k_numcoeffs_1, 2, &firCoeffs_24k_1[0], &firState_24k_1[0], buffLen_deci2x);
-    arm_fir_decimate_init_q31(&Sdeci_24k_2, deci_24k_numcoeffs_2, 2, &firCoeffs_24k_2[0], &firState_24k_2[0], buffLen_deci4x);
-    arm_fir_decimate_init_q31(&Sdeci_24k_3, deci_24k_numcoeffs_3, 2, &firCoeffs_24k_3[0], &firState_24k_3[0], buffLen_deci8x);
+    arm_fir_decimate_init_q31(&Sdeci_24k_0, deci_24k_numcoeffs_0, 2, &firCoeffs_24k_0[0], &fir_state_pin_pong_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+    arm_fir_decimate_init_q31(&Sdeci_24k_1, deci_24k_numcoeffs_1, 2, &firCoeffs_24k_1[0], &fir_state_pin_pong_1[0], buffLen_deci2x);
+    arm_fir_decimate_init_q31(&Sdeci_24k_2, deci_24k_numcoeffs_2, 2, &firCoeffs_24k_2[0], &fir_state_pin_pong_0[0], buffLen_deci4x);
+    arm_fir_decimate_init_q31(&Sdeci_24k_3, deci_24k_numcoeffs_3, 2, &firCoeffs_24k_3[0], &fir_state_pin_pong_1[0], buffLen_deci8x);
 
-    arm_fir_decimate_init_q31(&Sdeci_32k_0, deci_32k_numcoeffs_0, 2, &firCoeffs_32k_0[0], &firState_32k_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-    arm_fir_decimate_init_q31(&Sdeci_32k_1, deci_32k_numcoeffs_1, 2, &firCoeffs_32k_1[0], &firState_32k_1[0], buffLen_deci2x);
-    arm_fir_decimate_init_q31(&Sdeci_32k_2, deci_32k_numcoeffs_2, 3, &firCoeffs_32k_2[0], &firState_32k_2[0], buffLen_deci4x);
+    arm_fir_decimate_init_q31(&Sdeci_32k_0, deci_32k_numcoeffs_0, 2, &firCoeffs_32k_0[0], &fir_state_pin_pong_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+    arm_fir_decimate_init_q31(&Sdeci_32k_1, deci_32k_numcoeffs_1, 2, &firCoeffs_32k_1[0], &fir_state_pin_pong_1[0], buffLen_deci2x);
+    arm_fir_decimate_init_q31(&Sdeci_32k_2, deci_32k_numcoeffs_2, 3, &firCoeffs_32k_2[0], &fir_state_pin_pong_0[0], buffLen_deci4x);
 
-    arm_fir_decimate_init_q31(&Sdeci_48k_0, deci_48k_numcoeffs_0, 2, &firCoeffs_48k_0[0], &firState_48k_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-    arm_fir_decimate_init_q31(&Sdeci_48k_1, deci_48k_numcoeffs_1, 2, &firCoeffs_48k_1[0], &firState_48k_1[0], buffLen_deci2x);
-    arm_fir_decimate_init_q31(&Sdeci_48k_2, deci_48k_numcoeffs_2, 2, &firCoeffs_48k_2[0], &firState_48k_2[0], buffLen_deci4x);
+    arm_fir_decimate_init_q31(&Sdeci_48k_0, deci_48k_numcoeffs_0, 2, &firCoeffs_48k_0[0], &fir_state_pin_pong_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+    arm_fir_decimate_init_q31(&Sdeci_48k_1, deci_48k_numcoeffs_1, 2, &firCoeffs_48k_1[0], &fir_state_pin_pong_1[0], buffLen_deci2x);
+    arm_fir_decimate_init_q31(&Sdeci_48k_2, deci_48k_numcoeffs_2, 2, &firCoeffs_48k_2[0], &fir_state_pin_pong_0[0], buffLen_deci4x);
 
-    arm_fir_decimate_init_q31(&Sdeci_96k_0, deci_96k_numcoeffs_0, 2, &firCoeffs_96k_0[0], &firState_96k_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-    arm_fir_decimate_init_q31(&Sdeci_96k_1, deci_96k_numcoeffs_1, 2, &firCoeffs_96k_1[0], &firState_96k_1[0], buffLen_deci2x);
+    arm_fir_decimate_init_q31(&Sdeci_96k_0, deci_96k_numcoeffs_0, 2, &firCoeffs_96k_0[0], &fir_state_pin_pong_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+    arm_fir_decimate_init_q31(&Sdeci_96k_1, deci_96k_numcoeffs_1, 2, &firCoeffs_96k_1[0], &fir_state_pin_pong_1[0], buffLen_deci2x);
 
-    arm_fir_decimate_init_q31(&Sdeci_192k_0, deci_192k_numcoeffs_0, 2, &firCoeffs_192k_0[0], &firState_192k_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+    arm_fir_decimate_init_q31(&Sdeci_192k_0, deci_192k_numcoeffs_0, 2, &firCoeffs_192k_0[0], &fir_state_pin_pong_0[0], AUDIO_DMA_BUFF_LEN_IN_SAMPS);
 }
 
 uint32_t decimation_filter_downsample(
-    uint8_t *src_384kHz_24_bit,
+    uint8_t *src_384kHz,
     uint32_t src_len_in_bytes,
     uint8_t *dest,
     Wave_Header_Sample_Rate_t dest_sample_rate,
     Wave_Header_Bits_Per_Sample_t dest_bit_depth)
 {
-    data_converters_i24_to_q31(src_384kHz_24_bit, dmaDestBuff_32bit, src_len_in_bytes);
-
-    q31_t *src;
-    uint32_t buff_len;
+    q31_t *filtered_q31s;
+    uint32_t filtered_buff_len;
 
     switch (dest_sample_rate)
     {
-    case WAVE_HEADER_SAMPLE_RATE_192kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_192k_0, dmaDestBuff_32bit, dma_rx_deci_2x, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+    case WAVE_HEADER_SAMPLE_RATE_384kHz:
+        // 384k is a special case, no filtering, just optional truncation to 16 bits, early return for this case
+        if (dest_bit_depth == WAVE_HEADER_24_BITS_PER_SAMPLE)
+        {
+            // TODO: profile this naive loop, if it takes too long consider replacing it with a partially unrolled loop
+            // or even just a pointer swap (this would require making dest a pointer-to-a-pointer)
+            for (uint32_t i = 0; i < src_len_in_bytes; i++)
+            {
+                dest[i] = src_384kHz[i];
+            }
 
-        src = dma_rx_deci_2x;
-        buff_len = buffLen_deci2x;
+
+            return src_len_in_bytes;
+        }
+        else // it must be 16 bit samples
+        {
+            data_converters_i24_to_q15(src_384kHz, dest, src_len_in_bytes);
+            return (src_len_in_bytes * DATA_CONVERTERS_Q15_SIZE_IN_BYTES) / DATA_CONVERTERS_I24_SIZE_IN_BYTES;
+        }
+
+    case WAVE_HEADER_SAMPLE_RATE_192kHz:
+        arm_fir_decimate_fast_q31_bob(&Sdeci_192k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+
+        filtered_q31s = rx_ping_pong_buff_0;
+        filtered_buff_len = buffLen_deci2x;
 
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_96kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_0, dmaDestBuff_32bit, dma_rx_deci_2x, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_1, dma_rx_deci_2x, dma_rx_deci_4x, buffLen_deci2x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
 
-        src = dma_rx_deci_4x;
-        buff_len = buffLen_deci4x;
+        filtered_q31s = rx_ping_pong_buff_1;
+        filtered_buff_len = buffLen_deci4x;
 
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_48kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_0, dmaDestBuff_32bit, dma_rx_deci_2x, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_1, dma_rx_deci_2x, dma_rx_deci_4x, buffLen_deci2x);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_2, dma_rx_deci_4x, dma_rx_deci_8x, buffLen_deci4x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
 
-        src = dma_rx_deci_8x;
-        buff_len = buffLen_deci8x;
+        filtered_q31s = rx_ping_pong_buff_0;
+        filtered_buff_len = buffLen_deci8x;
 
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_32kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_0, dmaDestBuff_32bit, dma_rx_deci_2x, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_1, dma_rx_deci_2x, dma_rx_deci_4x, buffLen_deci2x);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_2, dma_rx_deci_4x, dma_rx_deci_12x, buffLen_deci4x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
 
-        src = dma_rx_deci_12x;
-        buff_len = buffLen_deci12x;
+        filtered_q31s = rx_ping_pong_buff_0;
+        filtered_buff_len = buffLen_deci12x;
 
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_24kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_0, dmaDestBuff_32bit, dma_rx_deci_2x, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_1, dma_rx_deci_2x, dma_rx_deci_4x, buffLen_deci2x);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_2, dma_rx_deci_4x, dma_rx_deci_8x, buffLen_deci4x);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_3, dma_rx_deci_8x, dma_rx_deci_16x, buffLen_deci8x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_3, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci8x);
 
-        src = dma_rx_deci_16x;
-        buff_len = buffLen_deci16x;
+        filtered_q31s = rx_ping_pong_buff_1;
+        filtered_buff_len = buffLen_deci16x;
 
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_16kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_0, dmaDestBuff_32bit, dma_rx_deci_2x, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_1, dma_rx_deci_2x, dma_rx_deci_4x, buffLen_deci2x);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_2, dma_rx_deci_4x, dma_rx_deci_8x, buffLen_deci4x);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_3, dma_rx_deci_8x, dma_rx_deci_24x, buffLen_deci8x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_3, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci8x);
 
-        src = dma_rx_deci_24x;
-        buff_len = buffLen_deci24x;
+        filtered_q31s = rx_ping_pong_buff_1;
+        filtered_buff_len = buffLen_deci24x;
 
         break;
-
-    default:
-        // TODO: handle the 384kHz case
-        return 0;
     }
 
-    const uint32_t retval = truncate_bit_depth(src, dest, buff_len, dest_bit_depth);
+    const uint32_t retval = truncate_bit_depth_from_q31(filtered_q31s, dest, filtered_buff_len, dest_bit_depth);
 
     return retval;
 }
 
 /* Private function definitions --------------------------------------------------------------------------------------*/
 
-uint32_t truncate_bit_depth(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps, Wave_Header_Bits_Per_Sample_t bit_depth)
+uint32_t truncate_bit_depth_from_q31(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps, Wave_Header_Bits_Per_Sample_t bit_depth)
 {
     if (bit_depth == WAVE_HEADER_16_BITS_PER_SAMPLE)
     {
         arm_q31_to_q15(src, (q15_t *)dest, src_len_in_samps);
-        return src_len_in_samps * 2;
+        return src_len_in_samps * DATA_CONVERTERS_Q15_SIZE_IN_BYTES;
     }
     else // it must by 24 bit
     {
         data_converters_q31_to_i24(src, dest, src_len_in_samps);
-        return src_len_in_samps * 3;
+        return src_len_in_samps * DATA_CONVERTERS_I24_SIZE_IN_BYTES;
     }
 }

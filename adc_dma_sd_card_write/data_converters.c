@@ -48,7 +48,7 @@ void data_converters_i24_swap_endianness(uint8_t *src, uint8_t *dest, uint32_t l
     }
 }
 
-void data_converters_i24_to_q31(uint8_t *src, q31_t *dest, uint32_t src_len_in_bytes)
+uint32_t data_converters_i24_to_q31_with_endian_swap(uint8_t *src, q31_t *dest, uint32_t src_len_in_bytes)
 {
     /**
      * convert an array of 24 bit samples into an array of q31's by processing chunks of 4 samples at a time. This is
@@ -58,9 +58,9 @@ void data_converters_i24_to_q31(uint8_t *src, q31_t *dest, uint32_t src_len_in_b
     // uint32_t dest_len = 0;
     // for (uint32_t i = 0; i < src_len_in_bytes;)
     // {
-    //     const uint8_t ls_byte = src[i++];
-    //     const uint8_t mid_byte = src[i++];
     //     const uint8_t ms_byte = src[i++];
+    //     const uint8_t mid_byte = src[i++];
+    //     const uint8_t ls_byte = src[i++];
 
     //     dest[dest_len++] = (q31_t)((ms_byte << 24) | (mid_byte << 16) | (ls_byte << 8));
     // }
@@ -81,10 +81,10 @@ void data_converters_i24_to_q31(uint8_t *src, q31_t *dest, uint32_t src_len_in_b
         in2 = *src_cast++;
         in3 = *src_cast++;
 
-        out1 = (in1 << 8);                                              // samp1, all 3 relevant bytes from in1
-        out2 = ((in1 >> 16) & 0x0000FF00) | ((in2 << 16) & 0xFFFF0000); // samp2, ls byte from in1, 2 ms bytes from in2
-        out3 = ((in2 >> 8) & 0x00FFFF00) | ((in3 << 24) & 0xFF000000);  // samp3, 2 ls bytes from in2, ms byte from in3
-        out4 = (in3 & 0xFFFFFF00);                                      // samp4, all 3 relevant bytes from in3
+        out1 = ((in1 << 24) & 0xFF000000) | ((in1 << 8) & 0x0FF0000) | ((in1 >> 8) & 0x0000FF00); // samp1, all 3 relevant bytes from in1
+        out2 = (in1 & 0xFF000000) | ((in2 << 16) & 0x0FF0000) | (in2 & 0x0000FF00);               // samp2, ms byte from in1, 2 ls bytes from in2
+        out3 = ((in2 << 8) & 0xFF000000) | ((in2 >> 8) & 0x0FF0000) | ((in3 << 8) & 0x0000FF00);  // samp3, 2 ms bytes from in2, ls byte from in3
+        out4 = ((in3 << 16) & 0xFF000000) | (in3 & 0x0FF0000) | ((in3 >> 16) & 0x0000FF00);       // samp4, all 3 relevant bytes from in3
 
         *__SIMD32(dest)++ = out1;
         *__SIMD32(dest)++ = out2;
@@ -93,9 +93,55 @@ void data_converters_i24_to_q31(uint8_t *src, q31_t *dest, uint32_t src_len_in_b
 
         block_count--;
     }
+
+    return (src_len_in_bytes * DATA_CONVERTERS_Q31_SIZE_IN_BYTES) / DATA_CONVERTERS_I24_SIZE_IN_BYTES;
 }
 
-void data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps)
+uint32_t data_converters_i24_to_q15(uint8_t *src, q15_t *dest, uint32_t src_len_in_bytes)
+{
+    /**
+     * convert an array of 24 bit samples into an array of q15's by processing chunks of 3 samples at a time. This is
+     * more efficient than a naive for-loop. An equivalent for-loop is shown below (commented out) for clarity.
+     */
+
+    // uint32_t dest_len = 0;
+    // for (uint32_t i = 0; i < src_len_in_bytes;)
+    // {
+    //     i++;
+    //     const uint8_t ls_byte = src[i++];
+    //     const uint8_t ms_byte = src[i++];
+
+    //     dest[dest_len++] = (q15_t)((ms_byte << 8) | ls_byte);
+    // }
+
+    // cast the input to an array of 32 bit q31's so we can loop through it as chunks more easily
+    q31_t *src_cast = (q31_t *)src;
+
+    // loop unrolling, compute 4 outputs at at time (three 32 bit input words comprise four 24 bit samples)
+    uint32_t block_count = src_len_in_bytes / DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES;
+
+    while (block_count > 0)
+    {
+        q31_t in1, in2, in3;
+        q31_t out1, out2;
+
+        in1 = *src_cast++;
+        in2 = *src_cast++;
+        in3 = *src_cast++;
+
+        out1 = ((in2 << 16) & 0xFFFF0000) | ((in1 >> 8) & 0x0000FFFF);
+        out2 = (in3 & 0xFFFF0000) | ((in3 << 8) & 0x0000FF00) | ((in2 >> 24) & 0x000000FF);
+
+        *__SIMD32(dest)++ = out1;
+        *__SIMD32(dest)++ = out2;
+
+        block_count--;
+    }
+
+    return (src_len_in_bytes * DATA_CONVERTERS_Q15_SIZE_IN_BYTES) / DATA_CONVERTERS_I24_SIZE_IN_BYTES;
+}
+
+uint32_t data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps)
 {
     /**
      * convert an array of q31's into an array of 24 bit signed integers by processing chunks of 4 samples at a time.
@@ -137,4 +183,6 @@ void data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_in_s
 
         block_count--;
     }
+
+    return src_len_in_samps * DATA_CONVERTERS_I24_SIZE_IN_BYTES;
 }

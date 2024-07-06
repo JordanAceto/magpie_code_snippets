@@ -74,7 +74,72 @@ TEST(TestDataConverters, i24_swap_endianness_should_not_go_past_array_end)
     ASSERT_EQ(dest[14], 0x0D); // <- these should not be swapped
 }
 
-TEST(TestDataConverters, i24_to_q31_smallest_chunk_check_all_bytes)
+TEST(TestDataConverters, i24_to_q15_smallest_chunk_check_all_bytes)
+{
+    // the smallest valid chunk is 12 bytes, which is four 24 bit samples
+    uint8_t src[DATA_CONVERTERS_I24_SMALLEST_VALID_CHUNK_SIZE] = {
+        0x00, 0x11, 0x22, // 1st sample
+        0x33, 0x44, 0x55,
+        0x66, 0x77, 0x88,
+        0x99, 0xAA, 0xBB}; // 4th sample
+
+    q15_t dest[4] = {0};
+
+    data_converters_i24_to_q15(src, dest, DATA_CONVERTERS_I24_SMALLEST_VALID_CHUNK_SIZE);
+
+    ASSERT_THAT(dest, ElementsAre(
+                          0x2211,
+                          0x5544,
+                          0x8877,
+                          0xBBAA));
+}
+
+TEST(TestDataConverters, i24_to_q15_check_sample_in_the_middle)
+{
+    // arbitrary number of samples to check, note that the num samples must be a multiple of 4
+    const uint8_t num_samps = 16;
+    const uint8_t src_len_in_bytes = num_samps * DATA_CONVERTERS_I24_SIZE_IN_BYTES;
+
+    uint8_t src[src_len_in_bytes];
+
+    // fill the array with mock data so we have something to check, use the idx as value so it's easy to test
+    for (uint8_t i = 0; i < src_len_in_bytes; i++)
+    {
+        src[i] = i;
+    }
+
+    q15_t dest[num_samps];
+
+    data_converters_i24_to_q15(src, dest, src_len_in_bytes);
+
+    // check an arbitrary sample in the middle
+    const uint32_t sample_to_check = 8;
+    const uint32_t src_idx_to_check = sample_to_check * DATA_CONVERTERS_I24_SIZE_IN_BYTES;
+
+    // the expected q15 is a right-shifted version of the original i24
+    const uint32_t expected = arr_slice_to_i24(src, src_idx_to_check) >> 8;
+
+    ASSERT_EQ(dest[sample_to_check], expected);
+}
+
+TEST(TestDataConverters, i24_to_q15_should_not_go_past_array_end)
+{
+    uint8_t src[DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES + DATA_CONVERTERS_I24_SIZE_IN_BYTES] = {
+        0x00, 0x01, 0x02,
+        0x03, 0x04, 0x05,
+        0x06, 0x07, 0x08,
+        0x09, 0x0A, 0x0B,
+        0xDA, 0xDB, 0x0D};          // extra sample at the that should not be moved into the destination array
+    uint32_t src_len_in_bytes = 12; // becaue the length here says to stop at after 4 samples
+
+    q15_t dest[5] = {0, 0, 0, 0, 42}; // sentinal value at the end should not be changed
+
+    data_converters_i24_to_q15(src, dest, src_len_in_bytes);
+
+    ASSERT_EQ(dest[4], 42);
+}
+
+TEST(TestDataConverters, i24_to_q31_with_endian_swap_smallest_chunk_check_all_bytes)
 {
     // the smallest valid chunk is 12 bytes, which is four 24 bit samples which will be expanded into 4 32 bit words
     uint8_t src[DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES] = {
@@ -85,16 +150,16 @@ TEST(TestDataConverters, i24_to_q31_smallest_chunk_check_all_bytes)
 
     q31_t dest[4] = {0};
 
-    data_converters_i24_to_q31(src, dest, DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES);
+    data_converters_i24_to_q31_with_endian_swap(src, dest, DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES);
 
     ASSERT_THAT(dest, ElementsAre(
-                          0x33221100,
-                          0x66554400,
-                          0x99887700,
-                          0xCCBBAA00));
+                          0x11223300,
+                          0x44556600,
+                          0x77889900,
+                          0xAABBCC00));
 }
 
-TEST(TestDataConverters, i24_to_q31_check_sample_in_the_middle)
+TEST(TestDataConverters, i24_to_q31_with_endian_swap_check_sample_in_the_middle)
 {
     // arbitrary number of samples to check, note that the num samples must be a multiple of 4
     const uint8_t num_samps = 16;
@@ -110,19 +175,20 @@ TEST(TestDataConverters, i24_to_q31_check_sample_in_the_middle)
 
     q31_t dest[num_samps];
 
-    data_converters_i24_to_q31(src, dest, src_len_in_bytes);
+    data_converters_i24_to_q31_with_endian_swap(src, dest, src_len_in_bytes);
 
     // check an arbitrary sample in the middle
     const uint32_t sample_to_check = 11;
     const uint32_t src_idx_to_check = sample_to_check * DATA_CONVERTERS_I24_SIZE_IN_BYTES;
 
     // the expected q31 is a left-shifted version of the original i24
-    const uint32_t expected = arr_slice_to_i24(src, src_idx_to_check) << 8;
+    const uint32_t expected_no_swap = arr_slice_to_i24(src, src_idx_to_check) << 8;
+    const uint32_t expected = ((expected_no_swap << 16) & 0xFF000000) | ((expected_no_swap << 0) & 0x00FF0000) | ((expected_no_swap >> 16) & 0x0000FF00);
 
     ASSERT_EQ(dest[sample_to_check], expected);
 }
 
-TEST(TestDataConverters, i24_to_q31_should_not_go_past_array_end)
+TEST(TestDataConverters, i24_to_q31_with_endian_swap_should_not_go_past_array_end)
 {
     uint8_t src[DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES + DATA_CONVERTERS_I24_SIZE_IN_BYTES] = {
         0x00, 0x01, 0x02,
@@ -134,7 +200,7 @@ TEST(TestDataConverters, i24_to_q31_should_not_go_past_array_end)
 
     q31_t dest[5] = {0, 0, 0, 0, 42}; // sentinal value at the end should not be changed
 
-    data_converters_i24_to_q31(src, dest, src_len_in_bytes);
+    data_converters_i24_to_q31_with_endian_swap(src, dest, src_len_in_bytes);
 
     ASSERT_EQ(dest[4], 42);
 }

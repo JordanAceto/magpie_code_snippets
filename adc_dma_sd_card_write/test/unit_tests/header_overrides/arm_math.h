@@ -6,4 +6,6 @@
 
 typedef int32_t q31_t;
 
+typedef int16_t q15_t;
+
 #define __SIMD32(addr) (*(int32_t **)&(addr))

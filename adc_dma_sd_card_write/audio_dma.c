@@ -14,11 +14,15 @@
 
 /* Private defines ---------------------------------------------------------------------------------------------------*/
 
+// data can be represented as either 3-byte or 4-byte samples
+#define AUDIO_DMA_BUFF_LEN_IN_I24_BYTES (AUDIO_DMA_BUFF_LEN_IN_SAMPS * DATA_CONVERTERS_I24_SIZE_IN_BYTES)
+#define AUDIO_DMA_BUFF_LEN_IN_Q31_BYTES (AUDIO_DMA_BUFF_LEN_IN_SAMPS * DATA_CONVERTERS_Q31_SIZE_IN_BYTES)
+
 // the number of stalls we can tolerate when the SD card takes longer to write than usual, MUST be a power of 2
 #define DMA_NUM_STALLS_ALLOWED (4)
 
 // the length of the big DMA buffer with spare room for tolerating SD card write stalls
-#define AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED)
+#define AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_LARGEST_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED)
 
 // halt compilation if the buffer lengths do not conform to the necessary multiplicity, this is so an even number of
 // samples can fit in the buffers for all sample rates
@@ -32,7 +36,7 @@
 #endif
 
 // the threshold for triggering a DMA request
-#define DMA_SPI_RX_THRESHOLD (AUDIO_DMA_SAMPLE_LEN_IN_BYTES * 8)
+#define DMA_SPI_RX_THRESHOLD (DATA_CONVERTERS_I24_SIZE_IN_BYTES * 8)
 
 // the SPI bus to use to read audio samples from the ADC
 #define DATA_SPI_BUS (MXC_SPI1)
@@ -43,7 +47,7 @@
 static int dma_channel = E_BAD_STATE;
 
 // audio samples from the ADC are dumped here
-static uint8_t dmaDestBuff[AUDIO_DMA_BUFF_LEN_IN_BYTES] = {0};
+static uint8_t dmaDestBuff[AUDIO_DMA_LARGEST_BUFF_LEN_IN_BYTES] = {0};
 
 // the big DMA buff can tolerate a few long SD card writes that go over the available time
 static uint8_t bigDMAbuff[AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES] = {0};
@@ -65,6 +69,9 @@ static const mxc_gpio_cfg_t adc_busy_pin = {
     .func = MXC_GPIO_FUNC_IN,
     .vssel = MXC_GPIO_VSSEL_VDDIO,
 };
+
+static Wave_Header_Sample_Rate_t current_sample_rate = WAVE_HEADER_SAMPLE_RATE_384kHz;
+static uint32_t current_bytes_per_sample = 3;
 
 /* Private function declarations -------------------------------------------------------------------------------------*/
 
@@ -105,7 +112,7 @@ Audio_DMA_Error_t audio_dma_init()
         .ch = dma_channel,
         .source = NULL,
         .dest = &dmaDestBuff[0],
-        .len = AUDIO_DMA_BUFF_LEN_IN_BYTES,
+        .len = AUDIO_DMA_BUFF_LEN_IN_I24_BYTES,
     };
 
     mxc_dma_config_t dma_config = {
@@ -123,7 +130,7 @@ Audio_DMA_Error_t audio_dma_init()
         .reqwait_en = 0,
         .tosel = MXC_DMA_TIMEOUT_4_CLK,
         .pssel = MXC_DMA_PRESCALE_DISABLE,
-        .burst_size = AUDIO_DMA_SAMPLE_LEN_IN_BITS,
+        .burst_size = 24,
     };
 
     if (MXC_DMA_ConfigChannel(dma_config, dma_transfer) != E_NO_ERROR)
@@ -159,6 +166,17 @@ Audio_DMA_Error_t audio_dma_init()
     }
 
     return AUDIO_DMA_ERROR_ALL_OK;
+}
+
+void audio_dma_set_sample_rate(Wave_Header_Sample_Rate_t sample_rate)
+{
+    current_sample_rate = sample_rate;
+    current_bytes_per_sample = ((sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz) ? 3 : 4);
+}
+
+Wave_Header_Sample_Rate_t audio_dma_get_sample_rate()
+{
+    return current_sample_rate;
 }
 
 Audio_DMA_Error_t audio_dma_start()
@@ -216,6 +234,11 @@ uint32_t audio_dma_num_buffers_available()
     return num_buffer_chunks_with_data_to_be_consumed;
 }
 
+uint32_t audio_dma_buffer_size_in_bytes()
+{
+    return AUDIO_DMA_BUFF_LEN_IN_SAMPS * current_bytes_per_sample;
+}
+
 uint8_t *audio_dma_consume_buffer()
 {
     static uint32_t blockPtrModulo = 0;
@@ -224,7 +247,7 @@ uint8_t *audio_dma_consume_buffer()
     uint8_t *retval = bigDMAbuff + offset;
 
     blockPtrModulo = (blockPtrModulo + 1) & (DMA_NUM_STALLS_ALLOWED - 1);
-    offset = blockPtrModulo * AUDIO_DMA_BUFF_LEN_IN_BYTES;
+    offset = blockPtrModulo * audio_dma_buffer_size_in_bytes();
 
     num_buffer_chunks_with_data_to_be_consumed -= 1;
 
@@ -245,9 +268,10 @@ void audio_dma_clear_overrun()
 
 void DMA0_IRQHandler()
 {
-    // note, the data is sadly in big-endian format (location 0 is an msb)
-    // but the wave file is little-endian, so we need to swap the
-    // MSByte and the LSbyte (the middle byte can stay the same)
+    // note, the data is sadly in big-endian format (location 0 is an msb) but the wave file is little-endian, so we
+    // need to swap the MSByte and the LSbyte (the middle byte can stay the same)
+
+    static uint32_t blockPtrModuloDMA = 0;
 
     MXC_DMA_Handler(MXC_DMA0);
     int flags = MXC_DMA_ChannelGetFlags(dma_channel); // clears the cfg enable bit
@@ -256,12 +280,18 @@ void DMA0_IRQHandler()
     static uint32_t offsetDMA = 0;
 
     // switch endian-ness while copying into the big DMA buffer
-    data_converters_i24_swap_endianness(dmaDestBuff, bigDMAbuff + offsetDMA, AUDIO_DMA_BUFF_LEN_IN_BYTES);
 
-    static uint32_t blockPtrModuloDMA = 0;
+    if (current_sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz) // 384kHz is a special case, no decimation filtering
+    {
+        data_converters_i24_swap_endianness(dmaDestBuff, bigDMAbuff + offsetDMA, audio_dma_buffer_size_in_bytes());
+    }
+    else // not the special case of 384kHz, for all other rates we want 32 bit samples for the decimation filters
+    {
+        data_converters_i24_to_q31_with_endian_swap(dmaDestBuff, bigDMAbuff + offsetDMA, audio_dma_buffer_size_in_bytes());
+    }
 
     blockPtrModuloDMA = (blockPtrModuloDMA + 1) & (DMA_NUM_STALLS_ALLOWED - 1);
-    offsetDMA = blockPtrModuloDMA * AUDIO_DMA_BUFF_LEN_IN_BYTES;
+    offsetDMA = blockPtrModuloDMA * audio_dma_buffer_size_in_bytes();
 
     num_buffer_chunks_with_data_to_be_consumed += 1;
 

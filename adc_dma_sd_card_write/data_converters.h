@@ -14,6 +14,9 @@
 
 /* Public definitions ------------------------------------------------------------------------------------------------*/
 
+// q15 samples take up 2 bytes
+#define DATA_CONVERTERS_Q15_SIZE_IN_BYTES (2)
+
 // an i24 integer sample takes up 3 bytes
 #define DATA_CONVERTERS_I24_SIZE_IN_BYTES (3)
 
@@ -32,7 +35,7 @@
  *
  * @param dest the destination buffer for the packed 24 bit samples, must be at least as long as `src`
  *
- * @param len_in_bytes the length in bytes of the source buffer, must be a multiple of 12 (the smallest valid chunk
+ * @param src_len_in_bytes the length in bytes of the source buffer, must be a multiple of 12 (the smallest valid chunk
  * size in bytes for i24 samples)
  *
  * @post the 24 bit samples in `s` are stored in `d` with their most significant byte and least significant byte swapped
@@ -48,20 +51,22 @@
  *  0B 0A 09 08, 07 06 05 04, 03 02 01 00  <- dest buffer post swapping, little endian, one chunk shown
  * |--------|---------|---------|--------| <- demarcation of the four 24 bit output samples
  */
-void data_converters_i24_swap_endianness(uint8_t *src, uint8_t *dest, uint32_t len_in_bytes);
+void data_converters_i24_swap_endianness(uint8_t *src, uint8_t *dest, uint32_t src_len_in_bytes);
 
 /**
- * @brief `data_converters_i24_to_q31(s, d, l)` converts source array `s` of packed 24 bit samples to q31's and stores
- * them in array `d`
+ * @brief `data_converters_i24_to_q31_with_endian_swap(s, d, l)` swaps the endianness of source array `s` of packed 24
+ * bit samples, expands them to q31's, and finally stores them in array `d`
  *
  * @param src the source buffer of signed 24 bit samples, must be at least `l` bytes long
  *
- * @param dest the destination for the expanded 32 bit samples, must be at least src_len * 4/3 bytes long TODO is this right?
+ * @param dest the destination for the expanded 32 bit samples, must be at least src_len * 4/3 bytes long
  *
  * @param src_len_in_bytes the length of the source array in bytes, not samples, must be a multiple of 12
  *
- * @post the dest array `d` is filled with the 24 bit sampes from `s` expanded to take up 32 bits, the least significant
- * bytes of the output samples are zero'd
+ * @retval the length of the data transferred to the dest buffer in bytes
+ *
+ * @post the dest array `d` is filled with the 24 bit sampes from `s` with the endianness swapped and expanded to take
+ * up 32 bits, the least significant bytes of the output samples are zero'd
  *
  * Example:
  * The below diagram shows four 24 bit input samples expanded into four 32 bit samples. The least significant bytes
@@ -70,10 +75,37 @@ void data_converters_i24_swap_endianness(uint8_t *src, uint8_t *dest, uint32_t l
  *               0B 0A 09 08, 07 06 05 04, 03 02 01 00  <- src buffer, one chunk shown
  *              |--------|---------|---------|--------| <- demarcation of the four 24 bit input samples
  *
- *  0B 0A 09 00, 08 07 06 00, 05 04 03 00, 02 01 00 00  <- dest buffer, one chunk shown
+ *  09 0A 0B 00, 06 07 08 00, 03 04 05 00, 00 01 20 00  <- dest buffer, one chunk shown, note the endianness swap
  * |------------|------------|------------|-----------| <- demarcation of the four 32 bit samples with the ls bytes zero'd
  */
-void data_converters_i24_to_q31(uint8_t *src, q31_t *dest, uint32_t src_len_in_bytes);
+uint32_t data_converters_i24_to_q31_with_endian_swap(uint8_t *src, q31_t *dest, uint32_t src_len_in_bytes);
+
+/**
+ * @brief `data_converters_i24_to_q15(s, d, l)` converts source array `s` of packed 24 bit samples to q15's and stores
+ * them in array `d`
+ *
+ * @param src the source buffer of signed 24 bit samples, must be at least `l` bytes long
+ *
+ * @param dest the destination for the truncated 16 bit samples, must be at least src_len * 2/3 bytes long
+ *
+ * @param src_len_in_bytes the length of the source array in bytes, not samples, must be a multiple of 12
+ *
+ * @retval the length of the data transferred to the dest buffer in bytes
+ *
+ * @post the dest array `d` is filled with the 16 bit sampes from `s` expanded to take up 32 bits, the least significant
+ * bytes of the output samples are zero'd
+ *
+ * Example:
+ * The below diagram shows four 24 bit input samples expanded into four 32 bit samples. The least significant bytes
+ * of each sample are zero'd out in the output buffer.
+ *
+ *  0B 0A 09 08, 07 06 05 04, 03 02 01 00  <- src buffer, one chunk shown
+ * |--------|---------|---------|--------| <- demarcation of the four 24 bit input samples
+ *
+ *               0B 0A 08 07, 05 04 02 01  <- dest buffer, one chunk shown
+ *              |-----|------|-----|-----| <- demarcation of the four 16 bit samples with the ls bytes truncated
+ */
+uint32_t data_converters_i24_to_q15(uint8_t *src, q15_t *dest, uint32_t src_len_in_bytes);
 
 /**
  * @brief `data_converters_q31_to_i24(s, d, l)` converts `l` samples from source array `s` of q31s to 24 bit signed
@@ -81,9 +113,11 @@ void data_converters_i24_to_q31(uint8_t *src, q31_t *dest, uint32_t src_len_in_b
  *
  * @param src the source array of q31 samples, must be at least `l` words long
  *
- * @param dest the destination array for the truncated 24 bit samples, must be at least src_len * 3/4 bytes long TODO is this right?
+ * @param dest the destination array for the truncated 24 bit samples, must be at least src_len * 3/4 bytes long
  *
  * @param src_len_in_samps the length of the source array in samples, not bytes, must be a multiple of 4
+ *
+ * @retval the length of the data transferred to the dest buffer in bytes
  *
  * @post the destination array `d` is filled with the 32 bit samples from `s` truncated to take up 24 bits. The 24 bit
  * samples are packed into the destination array so that four 24 bit samples fit into three 32 bit words.
@@ -100,6 +134,6 @@ void data_converters_i24_to_q31(uint8_t *src, q31_t *dest, uint32_t src_len_in_b
  *               0F 0E 0D 0B, 0A 09 07 06, 05 03 02 01  <- dest buffer, one chunk shown
  *              |--------|---------|---------|--------| <- demarcation of the four 24 bit truncated samples, split across the 32 bit words
  */
-void data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps);
+uint32_t data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps);
 
 #endif /* DATA_CONVERTERS_H_ */

@@ -9,6 +9,7 @@
 
 #include "ad4630.h"
 #include "audio_dma.h"
+#include "data_converters.h"
 #include "decimation_filter.h"
 #include "demo_config.h"
 #include "gpio_helpers.h"
@@ -31,24 +32,18 @@ typedef enum
 
 /* Private variables -------------------------------------------------------------------------------------------------*/
 
-// a variable to store the number of bytes written to the SD card, can be checked against the intended amount
-static uint32_t bytes_written;
-
-// a string buffer to write file names into
-static char file_name_buff[128];
-
 // a buffer for downsampled audio
-static uint8_t downsampled_audio[AUDIO_DMA_BUFF_LEN_IN_BYTES];
+static uint8_t downsampled_audio[AUDIO_DMA_LARGEST_BUFF_LEN_IN_BYTES];
 
-static const uint32_t num_sample_rates_to_test = 5;
+static const uint32_t num_sample_rates_to_test = 6;
 static const Wave_Header_Sample_Rate_t sample_rates[] = {
     WAVE_HEADER_SAMPLE_RATE_16kHz,
     WAVE_HEADER_SAMPLE_RATE_24kHz,
     WAVE_HEADER_SAMPLE_RATE_32kHz,
     WAVE_HEADER_SAMPLE_RATE_48kHz,
     WAVE_HEADER_SAMPLE_RATE_96kHz,
-    // WAVE_HEADER_SAMPLE_RATE_192kHz, // TODO: 192kHz doesn't work yet, it takes too long
-    // WAVE_HEADER_SAMPLE_RATE_384kHz, // TODO: 383kHz only works at 24 bit for now
+    // WAVE_HEADER_SAMPLE_RATE_192kHz, // TODO: 192kHz doesn't work yet, it takes too long to finish
+    WAVE_HEADER_SAMPLE_RATE_384kHz,
 };
 
 static const uint32_t num_bit_depths_to_test = 2;
@@ -118,6 +113,7 @@ int main(void)
     {
         for (uint32_t bd = 0; bd < num_bit_depths_to_test; bd++)
         {
+            // green led on during recording
             LED_On(LED_COLOR_GREEN);
             wav_attr.sample_rate = sample_rates[sr];
             wav_attr.bits_per_sample = bit_depths[bd];
@@ -148,6 +144,12 @@ int main(void)
 
 void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_secs)
 {
+    // a variable to store the number of bytes written to the SD card, can be checked against the intended amount
+    static uint32_t bytes_written;
+
+    // a string buffer to write file names into
+    static char file_name_buff[64];
+
     // there will be some integer truncation here, good enough for this early demo, but improve file-len code eventually
     const uint32_t file_len_in_microsecs = file_len_secs * 1000000;
     const uint32_t num_dma_blocks_in_the_file = file_len_in_microsecs / AUDIO_DMA_CHUNK_READY_PERIOD_IN_MICROSECS;
@@ -166,6 +168,7 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
         error_handler(LED_COLOR_RED);
     }
 
+    audio_dma_set_sample_rate(wav_attr->sample_rate);
     ad4630_cont_conversions_start();
     audio_dma_start();
 
@@ -178,27 +181,16 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
 
         while (audio_dma_num_buffers_available() > 0)
         {
-            if (wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz)
-            {
-                // 384k is a special case, no downsampling here
-                if (sd_card_fwrite(audio_dma_consume_buffer(), AUDIO_DMA_BUFF_LEN_IN_BYTES, &bytes_written) != SD_CARD_ERROR_ALL_OK)
-                {
-                    error_handler(LED_COLOR_RED);
-                }
-            }
-            else // all other sample rates get downsampled before writing to the SD card
-            {
-                const uint32_t downsampled_buff_len = decimation_filter_downsample(
-                    audio_dma_consume_buffer(),
-                    AUDIO_DMA_BUFF_LEN_IN_BYTES,
-                    downsampled_audio,
-                    wav_attr->sample_rate,
-                    wav_attr->bits_per_sample);
+            const uint32_t downsampled_buff_len = decimation_filter_downsample(
+                audio_dma_consume_buffer(),
+                audio_dma_buffer_size_in_bytes(),
+                downsampled_audio,
+                wav_attr->sample_rate,
+                wav_attr->bits_per_sample);
 
-                if (sd_card_fwrite(downsampled_audio, downsampled_buff_len, &bytes_written) != SD_CARD_ERROR_ALL_OK)
-                {
-                    error_handler(LED_COLOR_RED);
-                }
+            if (sd_card_fwrite(downsampled_audio, downsampled_buff_len, &bytes_written) != SD_CARD_ERROR_ALL_OK)
+            {
+                error_handler(LED_COLOR_RED);
             }
 
             num_dma_blocks_written += 1;

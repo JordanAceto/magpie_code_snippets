@@ -26,17 +26,20 @@ void decimation_filter_init();
  * @brief `decimation_filter_downsample(s, sl, d, dsr, dbd)` downsamples source buffer `s` of length `sl` and stores the
  * result in out destination buffer `d` with sample rate `dsr` and bit depth `dbd`.
  *
+ * For the special case of 384kHz this function only convertes the final bit depth, no decimation filtering is applied.
+ *
  * @pre `decimation_filter_init()` has been called
  *
- * @param src_384kHz_24_bit the source buffer to downsample. It is expected that this is the 384kHz 24 bit buffer filled
- * with samples from the ADC via DMA.
+ * @param src_384kHz the source buffer to downsample. It is expected that this is the 384kHz buffer with  the correct
+ * endianness for the final wav files filled with samples from the ADC via DMA. The samples contained in this buffer
+ * can be either 3 bytes wide or 4 bytes. For all output sample rates besides 384kHz we input 4 byte wide samples. For
+ * the special case of 384kHz output sample rate we input 3 byte wide samples.
  *
- * @param src_len_in_bytes the length of the source buffer, expected to be the DMA buffer length defined by the DMA
+ * @param src_len_in_bytes the length of the source buffer in bytes
  *
  * @param dest the destination buffer for the downsampled data. Must be long enough to hold the downsampled data.
  *
- * @param dest_sample_rate the enumerated sample rate to use for the downsampled data. All sample rates are valid inputs
- * except for 384kHz, since there is no downsampling to do for this rate.
+ * @param dest_sample_rate the enumerated sample rate to use for the downsampled data.
  *
  * @param dest_bit_depth the enumerated bit depth to use for the downsampled data
  *
@@ -45,7 +48,7 @@ void decimation_filter_init();
  * @retval the length of the downsampled destination buffer in bytes
  */
 uint32_t decimation_filter_downsample(
-    uint8_t *src_384kHz_24_bit,
+    uint8_t *src_384kHz,
     uint32_t src_len_in_bytes,
     uint8_t *dest,
     Wave_Header_Sample_Rate_t dest_sample_rate,

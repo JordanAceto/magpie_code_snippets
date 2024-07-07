@@ -8,7 +8,11 @@
 #include <gmock/gmock.h>
 
 #include "test_helpers.hpp"
+
+extern "C"
+{
 #include "wav_header.h"
+}
 
 /**
  * @brief Enumerated starting positions for the various sections of a wav header are represented here.

@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "data_converters.h"
+
 #include "test_helpers.hpp"
+
+extern "C"
+{
+#include "data_converters.h"
+}
 
 using namespace testing;
 

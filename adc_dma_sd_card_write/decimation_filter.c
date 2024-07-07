@@ -5,7 +5,6 @@
 #include "audio_dma.h"
 #include "data_converters.h"
 #include "decimation_filter.h"
-#include "gpio_helpers.h" // used for profiling/timing tests
 
 /* Private defines ---------------------------------------------------------------------------------------------------*/
 
@@ -65,49 +64,49 @@
 /* Private variables -------------------------------------------------------------------------------------------------*/
 
 // 16 k
-static const q31_t firCoeffs_16k_0[deci_16k_numcoeffs_0] = {
+static q31_t firCoeffs_16k_0[deci_16k_numcoeffs_0] = {
     86385383, 380767973, 588547483, 380767973, 86385383};
-static const q31_t firCoeffs_16k_1[deci_16k_numcoeffs_1] = {
+static q31_t firCoeffs_16k_1[deci_16k_numcoeffs_1] = {
     -63623254, 11777617, 601023485, 1051356664, 601023485, 11777617, -63623254};
-static const q31_t firCoeffs_16k_2[deci_16k_numcoeffs_2] = {
+static q31_t firCoeffs_16k_2[deci_16k_numcoeffs_2] = {
     -27728029, -77658950, 90916825, 613537738, 945568961, 613537738, 90916825, -77658950, -27728029};
-static const q31_t firCoeffs_16k_3[deci_16k_numcoeffs_3] = {
+static q31_t firCoeffs_16k_3[deci_16k_numcoeffs_3] = {
     544679, 5591621, 10519170, 11396576, 3740919, -9199321, -16459240, -8186184, 12423382, 27105429, 17140829, -15659956, -43184586, -32667249, 18552286, 68866053, 61256147, -20863109, -119392334, -129148756, 22338651, 303309288, 578589578, 692986716, 578589578, 303309288, 22338651, -129148756, -119392334, -20863109, 61256147, 68866053, 18552286, -32667249, -43184586, -15659956, 17140829, 27105429, 12423382, -8186184, -16459240, -9199321, 3740919, 11396576, 10519170, 5591621, 544679};
 
 // 24k
-static const q31_t firCoeffs_24k_0[deci_24k_numcoeffs_0] = {
+static q31_t firCoeffs_24k_0[deci_24k_numcoeffs_0] = {
     87026071, 382177371, 589816446, 382177371, 87026071};
-static const q31_t firCoeffs_24k_1[deci_24k_numcoeffs_1] = {
+static q31_t firCoeffs_24k_1[deci_24k_numcoeffs_1] = {
     -59682168, 25489114, 599055019, 1028294198, 599055019, 25489114, -59682168};
-static const q31_t firCoeffs_24k_2[deci_24k_numcoeffs_2] = {
+static q31_t firCoeffs_24k_2[deci_24k_numcoeffs_2] = {
     -35829136, -93392547, 90204797, 624894336, 955274946, 624894336, 90204797, -93392547, -35829136};
-static const q31_t firCoeffs_24k_3[deci_24k_numcoeffs_3] = {
+static q31_t firCoeffs_24k_3[deci_24k_numcoeffs_3] = {
     -2823963, 804105, 13756249, 13832557, -12099816, -21810016, 17681236, 39284877, -22118934, -66381589, 26258540, 112809109, -29540929, -212849373, 31655722, 678451831, 1041361918, 678451831, 31655722, -212849373, -29540929, 112809109, 26258540, -66381589, -22118934, 39284877, 17681236, -21810016, -12099816, 13832557, 13756249, 804105, -2823963};
 
 // 32 k
-static const q31_t firCoeffs_32k_0[deci_32k_numcoeffs_0] = {
+static q31_t firCoeffs_32k_0[deci_32k_numcoeffs_0] = {
     -44988434, 8328033, 424987782, 743421426, 424987782, 8328033, -44988434};
-static const q31_t firCoeffs_32k_1[deci_32k_numcoeffs_1] = {
+static q31_t firCoeffs_32k_1[deci_32k_numcoeffs_1] = {
     -27728029, -77658950, 90916825, 613537738, 945568961, 613537738, 90916825, -77658950, -27728029};
-static const q31_t firCoeffs_32k_2[deci_32k_numcoeffs_2] = {
+static q31_t firCoeffs_32k_2[deci_32k_numcoeffs_2] = {
     544679, 5591621, 10519170, 11396576, 3740919, -9199321, -16459240, -8186184, 12423382, 27105429, 17140829, -15659956, -43184586, -32667249, 18552286, 68866053, 61256147, -20863109, -119392334, -129148756, 22338651, 303309288, 578589578, 692986716, 578589578, 303309288, 22338651, -129148756, -119392334, -20863109, 61256147, 68866053, 18552286, -32667249, -43184586, -15659956, 17140829, 27105429, 12423382, -8186184, -16459240, -9199321, 3740919, 11396576, 10519170, 5591621, 544679};
 
 // 48 k
-static const q31_t firCoeffs_48k_0[deci_48k_numcoeffs_0] = {
+static q31_t firCoeffs_48k_0[deci_48k_numcoeffs_0] = {
     -42201666, 18023525, 423595866, 727113801, 423595866, 18023525, -42201666};
-static const q31_t firCoeffs_48k_1[deci_48k_numcoeffs_1] = {
+static q31_t firCoeffs_48k_1[deci_48k_numcoeffs_1] = {
     -35829136, -93392547, 90204797, 624894336, 955274946, 624894336, 90204797, -93392547, -35829136};
-static const q31_t firCoeffs_48k_2[deci_48k_numcoeffs_2] = {
+static q31_t firCoeffs_48k_2[deci_48k_numcoeffs_2] = {
     -2823963, 804105, 13756249, 13832557, -12099816, -21810016, 17681236, 39284877, -22118934, -66381589, 26258540, 112809109, -29540929, -212849373, 31655722, 678451831, 1041361918, 678451831, 31655722, -212849373, -29540929, 112809109, 26258540, -66381589, -22118934, 39284877, 17681236, -21810016, -12099816, 13832557, 13756249, 804105, -2823963};
 
 // 96 k
-static const q31_t firCoeffs_96k_0[deci_96k_numcoeffs_0] = {
+static q31_t firCoeffs_96k_0[deci_96k_numcoeffs_0] = {
     -20749647, -66609278, 51582801, 442242045, 691682165, 442242045, 51582801, -66609278, -20749647};
-static const q31_t firCoeffs_96k_1[deci_96k_numcoeffs_1] = {
+static q31_t firCoeffs_96k_1[deci_96k_numcoeffs_1] = {
     -3229201, 1658598, 16721610, 16330065, -12855261, -23661054, 18450717, 41258441, -22628821, -68277309, 26456118, 114386501, -29451143, -213892037, 31368109, 678814008, 1041713732, 678814008, 31368109, -213892037, -29451143, 114386501, 26456118, -68277309, -22628821, 41258441, 18450717, -23661054, -12855261, 16330065, 16721610, 1658598, -3229201};
 
 // 192 k
-static const q31_t firCoeffs_192k_0[deci_192k_numcoeffs_0] = {
+static q31_t firCoeffs_192k_0[deci_192k_numcoeffs_0] = {
     -21932835, -31283673, 20226235, 65093442, -23389170, -137747312, 30271796, 477147941, 730493753, 477147941, 30271796, -137747312, -23389170, 65093442, 20226235, -31283673, -21932835};
 
 // decimated buffers for various stages of the multi-rate filters, reused in a ping-pong fashion to save SRAM
@@ -201,6 +200,8 @@ uint32_t decimation_filter_downsample(
     Wave_Header_Sample_Rate_t dest_sample_rate,
     Wave_Header_Bits_Per_Sample_t dest_bit_depth)
 {
+    q31_t *src_q31_cast = (q31_t *)src_384kHz;
+
     q31_t *filtered_q31s;
     uint32_t filtered_buff_len;
 
@@ -217,17 +218,16 @@ uint32_t decimation_filter_downsample(
                 dest[i] = src_384kHz[i];
             }
 
-
             return src_len_in_bytes;
         }
         else // it must be 16 bit samples
         {
-            data_converters_i24_to_q15(src_384kHz, dest, src_len_in_bytes);
+            data_converters_i24_to_q15(src_384kHz, (q15_t *)dest, src_len_in_bytes);
             return (src_len_in_bytes * DATA_CONVERTERS_Q15_SIZE_IN_BYTES) / DATA_CONVERTERS_I24_SIZE_IN_BYTES;
         }
 
     case WAVE_HEADER_SAMPLE_RATE_192kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_192k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_192k_0, src_q31_cast, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
 
         filtered_q31s = rx_ping_pong_buff_0;
         filtered_buff_len = buffLen_deci2x;
@@ -235,7 +235,7 @@ uint32_t decimation_filter_downsample(
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_96kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_0, src_q31_cast, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
         arm_fir_decimate_fast_q31_bob(&Sdeci_96k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
 
         filtered_q31s = rx_ping_pong_buff_1;
@@ -244,7 +244,7 @@ uint32_t decimation_filter_downsample(
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_48kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_0, src_q31_cast, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
         arm_fir_decimate_fast_q31_bob(&Sdeci_48k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
         arm_fir_decimate_fast_q31_bob(&Sdeci_48k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
 
@@ -254,7 +254,7 @@ uint32_t decimation_filter_downsample(
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_32kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_0, src_q31_cast, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
         arm_fir_decimate_fast_q31_bob(&Sdeci_32k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
         arm_fir_decimate_fast_q31_bob(&Sdeci_32k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
 
@@ -264,7 +264,7 @@ uint32_t decimation_filter_downsample(
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_24kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_0, src_q31_cast, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
         arm_fir_decimate_fast_q31_bob(&Sdeci_24k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
         arm_fir_decimate_fast_q31_bob(&Sdeci_24k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
         arm_fir_decimate_fast_q31_bob(&Sdeci_24k_3, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci8x);
@@ -275,7 +275,7 @@ uint32_t decimation_filter_downsample(
         break;
 
     case WAVE_HEADER_SAMPLE_RATE_16kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_0, src_384kHz, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
+        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_0, src_q31_cast, rx_ping_pong_buff_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
         arm_fir_decimate_fast_q31_bob(&Sdeci_16k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci2x);
         arm_fir_decimate_fast_q31_bob(&Sdeci_16k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, buffLen_deci4x);
         arm_fir_decimate_fast_q31_bob(&Sdeci_16k_3, rx_ping_pong_buff_0, rx_ping_pong_buff_1, buffLen_deci8x);

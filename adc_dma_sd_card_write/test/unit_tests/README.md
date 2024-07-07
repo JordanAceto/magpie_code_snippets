@@ -65,7 +65,7 @@ The library files to move are `libgmock.a`, `libgmock_main.a`, `libgtest.a`, and
     - The default command prints only a brief summary plus any failing tests
 - `$ make verbose`
     - The verbose version prints out info about all the tests, not just those that fail
-- `$ make file`
+- `$ make report`
     - This option generates an XML file of the test results in this directory
 - `$ make clean`
     - Delete any test executable files and build artifacts

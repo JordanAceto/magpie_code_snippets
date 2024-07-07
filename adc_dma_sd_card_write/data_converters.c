@@ -8,8 +8,9 @@
 void data_converters_i24_swap_endianness(uint8_t *src, uint8_t *dest, uint32_t len_in_bytes)
 {
     /**
-     * swap the endianness of an array of 24 bit samples in-place four samples at a time. This is faster than using
-     * a simple for-loop. An equivalent for-loop is shown below (commented out) for clarity.
+     * Swap the endianness of an array of 24 bit samples four samples at a time.
+     * Each chunk: 12 bytes in, 12 bytes out.
+     * This is faster than using a simple for-loop. An equivalent for-loop is shown below (commented out) for clarity.
      */
 
     // for (uint32_t i = 0; i < len_in_bytes; i += 3)
@@ -51,8 +52,9 @@ void data_converters_i24_swap_endianness(uint8_t *src, uint8_t *dest, uint32_t l
 uint32_t data_converters_i24_to_q31_with_endian_swap(uint8_t *src, q31_t *dest, uint32_t src_len_in_bytes)
 {
     /**
-     * convert an array of 24 bit samples into an array of q31's by processing chunks of 4 samples at a time. This is
-     * more efficient than a naive for-loop. An equivalent for-loop is shown below (commented out) for clarity.
+     * Convert an array of 24 bit samples into an array of q31's by processing chunks of 4 samples at a time.
+     * Each chunk: 12 bytes in, 16 bytes out.
+     * This is more efficient than a naive for-loop. An equivalent for-loop is shown below (commented out) for clarity.
      */
 
     // uint32_t dest_len = 0;
@@ -100,8 +102,9 @@ uint32_t data_converters_i24_to_q31_with_endian_swap(uint8_t *src, q31_t *dest, 
 uint32_t data_converters_i24_to_q15(uint8_t *src, q15_t *dest, uint32_t src_len_in_bytes)
 {
     /**
-     * convert an array of 24 bit samples into an array of q15's by processing chunks of 3 samples at a time. This is
-     * more efficient than a naive for-loop. An equivalent for-loop is shown below (commented out) for clarity.
+     * Convert an array of 24 bit samples into an array of q15's by processing chunks of 4 samples at a time.
+     * Each chunk: 12 bytes in, 8 bytes out.
+     * This is more efficient than a naive for-loop. An equivalent for-loop is shown below (commented out) for clarity.
      */
 
     // uint32_t dest_len = 0;
@@ -144,7 +147,8 @@ uint32_t data_converters_i24_to_q15(uint8_t *src, q15_t *dest, uint32_t src_len_
 uint32_t data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps)
 {
     /**
-     * convert an array of q31's into an array of 24 bit signed integers by processing chunks of 4 samples at a time.
+     * Convert an array of q31's into an array of 24 bit integers by processing chunks of 4 samples at a time.
+     * Each chunk: 16 bytes in, 12 bytes out.
      * This is more efficient than a naive for-loop. An equivalent for-loop is shown below (commented out) for clarity.
      */
 

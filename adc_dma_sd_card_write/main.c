@@ -35,23 +35,6 @@ typedef enum
 // a buffer for downsampled audio
 static uint8_t downsampled_audio[AUDIO_DMA_LARGEST_BUFF_LEN_IN_BYTES];
 
-static const uint32_t num_sample_rates_to_test = 6;
-static const Wave_Header_Sample_Rate_t sample_rates[] = {
-    WAVE_HEADER_SAMPLE_RATE_16kHz,
-    WAVE_HEADER_SAMPLE_RATE_24kHz,
-    WAVE_HEADER_SAMPLE_RATE_32kHz,
-    WAVE_HEADER_SAMPLE_RATE_48kHz,
-    WAVE_HEADER_SAMPLE_RATE_96kHz,
-    // WAVE_HEADER_SAMPLE_RATE_192kHz, // TODO: 192kHz doesn't work yet, it takes too long to finish
-    WAVE_HEADER_SAMPLE_RATE_384kHz,
-};
-
-static const uint32_t num_bit_depths_to_test = 2;
-static const Wave_Header_Bits_Per_Sample_t bit_depths[] = {
-    WAVE_HEADER_16_BITS_PER_SAMPLE,
-    WAVE_HEADER_24_BITS_PER_SAMPLE,
-};
-
 /* Private function declarations -------------------------------------------------------------------------------------*/
 
 /**
@@ -109,14 +92,14 @@ int main(void)
 
     LED_Off(LED_COLOR_BLUE);
 
-    for (uint32_t sr = 0; sr < num_sample_rates_to_test; sr++)
+    for (uint32_t sr = 0; sr < DEMO_CONFIG_NUM_SAMPLE_RATES_TO_TEST; sr++)
     {
-        for (uint32_t bd = 0; bd < num_bit_depths_to_test; bd++)
+        for (uint32_t bd = 0; bd < DEMO_CONFIG_NUM_BIT_DEPTHS_TO_TEST; bd++)
         {
             // green led on during recording
             LED_On(LED_COLOR_GREEN);
-            wav_attr.sample_rate = sample_rates[sr];
-            wav_attr.bits_per_sample = bit_depths[bd];
+            wav_attr.sample_rate = demo_sample_rates_to_test[sr];
+            wav_attr.bits_per_sample = demo_bit_depths_to_test[bd];
             write_demo_wav_file(&wav_attr, DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS);
             LED_Off(LED_COLOR_GREEN);
 

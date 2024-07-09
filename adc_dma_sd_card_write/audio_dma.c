@@ -27,7 +27,7 @@
 // halt compilation if the buffer lengths do not conform to the necessary multiplicity, this is so an even number of
 // samples can fit in the buffers for all sample rates
 #define AUDIO_DMA_MAIN_BUFFER_LEN_MANDATORY_LCM (48)
-#if (AUDIO_DMA_BUFF_LEN_IN_SAMPS & AUDIO_DMA_MAIN_BUFFER_LEN_MANDATORY_LCM)
+#if (AUDIO_DMA_BUFF_LEN_IN_SAMPS % AUDIO_DMA_MAIN_BUFFER_LEN_MANDATORY_LCM)
 #error "Main audio DMA buffer length must be divisible by 2, 4, 8, 12, 16, and 24"
 #endif
 // this check ensures that we can fit an even number of 3-byte samples into the DMA buffer

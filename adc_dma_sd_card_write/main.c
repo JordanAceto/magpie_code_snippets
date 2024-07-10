@@ -151,7 +151,10 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
         error_handler(LED_COLOR_RED);
     }
 
-    audio_dma_set_sample_rate(wav_attr->sample_rate);
+    // 384kHz is a special case where we take 24 bit samples from the DMA, for all other sample rates we want 32 bit samples
+    audio_dma_set_sample_width(
+        wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz ? AUDIO_DMA_SAMPLE_WIDTH_24_BITS : AUDIO_DMA_SAMPLE_WIDTH_32_BITS);
+
     ad4630_cont_conversions_start();
     audio_dma_start();
 

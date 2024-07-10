@@ -31,13 +31,13 @@
 #error "Main audio DMA buffer length must be divisible by 2, 4, 8, 12, 16, and 24"
 #endif
 // this check ensures that we can fit an even number of 3-byte samples into the DMA buffer
-#if (AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES % DATA_CONVERTERS_I24_SMALLEST_VALID_CHUNK_SIZE)
-#error "Big audio DMA buffer length must be a multiple of 12 bytes"
+#if (AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES % AUDIO_DMA_MAIN_BUFFER_LEN_MANDATORY_LCM)
+#error "Big audio DMA buffer length must be divisible by 2, 4, 8, 12, 16, and 24"
 #endif
 
 // the threshold for triggering a DMA request
 #define DMA_SPI_RX_THRESHOLD (DATA_CONVERTERS_I24_SIZE_IN_BYTES * 8)
-
+\
 // the SPI bus to use to read audio samples from the ADC
 #define DATA_SPI_BUS (MXC_SPI1)
 
@@ -70,8 +70,7 @@ static const mxc_gpio_cfg_t adc_busy_pin = {
     .vssel = MXC_GPIO_VSSEL_VDDIO,
 };
 
-static Wave_Header_Sample_Rate_t current_sample_rate = WAVE_HEADER_SAMPLE_RATE_384kHz;
-static uint32_t current_bytes_per_sample = 3;
+static Audio_DMA_Sample_Width_t current_sample_width = AUDIO_DMA_SAMPLE_WIDTH_32_BITS;
 
 /* Private function declarations -------------------------------------------------------------------------------------*/
 
@@ -168,15 +167,14 @@ Audio_DMA_Error_t audio_dma_init()
     return AUDIO_DMA_ERROR_ALL_OK;
 }
 
-void audio_dma_set_sample_rate(Wave_Header_Sample_Rate_t sample_rate)
+void audio_dma_set_sample_width(Audio_DMA_Sample_Width_t sample_width)
 {
-    current_sample_rate = sample_rate;
-    current_bytes_per_sample = ((sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz) ? 3 : 4);
+    current_sample_width = sample_width;
 }
 
-Wave_Header_Sample_Rate_t audio_dma_get_sample_rate()
+Wave_Header_Sample_Rate_t audio_dma_get_sample_width()
 {
-    return current_sample_rate;
+    return current_sample_width;
 }
 
 Audio_DMA_Error_t audio_dma_start()
@@ -236,7 +234,7 @@ uint32_t audio_dma_num_buffers_available()
 
 uint32_t audio_dma_buffer_size_in_bytes()
 {
-    return AUDIO_DMA_BUFF_LEN_IN_SAMPS * current_bytes_per_sample;
+    return AUDIO_DMA_BUFF_LEN_IN_SAMPS * (current_sample_width == AUDIO_DMA_SAMPLE_WIDTH_24_BITS ? 3 : 4);
 }
 
 uint8_t *audio_dma_consume_buffer()
@@ -281,11 +279,11 @@ void DMA0_IRQHandler()
 
     // switch endian-ness while copying into the big DMA buffer
 
-    if (current_sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz) // 384kHz is a special case, no decimation filtering
+    if (current_sample_width == AUDIO_DMA_SAMPLE_WIDTH_24_BITS)
     {
         data_converters_i24_swap_endianness(dmaDestBuff, bigDMAbuff + offsetDMA, audio_dma_buffer_size_in_bytes());
     }
-    else // not the special case of 384kHz, for all other rates we want 32 bit samples for the decimation filters
+    else // it must be 32 bit wide samples
     {
         data_converters_i24_to_q31_with_endian_swap(dmaDestBuff, bigDMAbuff + offsetDMA, audio_dma_buffer_size_in_bytes());
     }

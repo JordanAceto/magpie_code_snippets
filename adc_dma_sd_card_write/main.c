@@ -65,8 +65,6 @@ int main(void)
 
     gpio_profiling_pin_init();
 
-    decimation_filter_init();
-
     if (ad4630_init() != AD4630_ERROR_ALL_OK)
     {
         error_handler(LED_COLOR_BLUE);
@@ -155,6 +153,8 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
     audio_dma_set_sample_width(
         wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz ? AUDIO_DMA_SAMPLE_WIDTH_24_BITS : AUDIO_DMA_SAMPLE_WIDTH_32_BITS);
 
+    decimation_filter_set_sample_rate(wav_attr->sample_rate);
+
     ad4630_cont_conversions_start();
     audio_dma_start();
 
@@ -171,7 +171,6 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
                 audio_dma_consume_buffer(),
                 audio_dma_buffer_size_in_bytes(),
                 downsampled_audio,
-                wav_attr->sample_rate,
                 wav_attr->bits_per_sample);
 
             if (sd_card_fwrite(downsampled_audio, downsampled_buff_len, &bytes_written) != SD_CARD_ERROR_ALL_OK)

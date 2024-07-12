@@ -16,19 +16,23 @@
 /* Public function declarations --------------------------------------------------------------------------------------*/
 
 /**
- * @brief `decimation_filter_init()` initializes the decimation filter module, must be called before using the filter.
+ * `decimation_filter_set_sample_rate(sr)` sets the sample rate for the decimation filter to `sr`
  *
- * @post the filter module is initialized, calls to downsample may now be performed.
+ * @param sample_rate the enumerated sample rate to use for following calls to `decimation_filter_downsample()`
+ *
+ * @post Future calls to `decimation_filter_downsample()` will use the sample rate set here until changed by calling
+ * this function again with a new sample rate.
  */
-void decimation_filter_init();
+void decimation_filter_set_sample_rate(Wave_Header_Sample_Rate_t sample_rate);
 
 /**
- * @brief `decimation_filter_downsample(s, sl, d, dsr, dbd)` downsamples source buffer `s` of length `sl` and stores the
- * result in out destination buffer `d` with sample rate `dsr` and bit depth `dbd`.
+ * @brief `decimation_filter_downsample(s, sl, d, dbd)` downsamples source buffer `s` of length `sl` and
+ * stores the result in out destination buffer `d` with bit depth `dbd` and sample rate previously set by
+ * `decimation_filter_set_sample_rate(sr)`
  *
  * For the special case of 384kHz this function only convertes the final bit depth, no decimation filtering is applied.
  *
- * @pre `decimation_filter_init()` has been called
+ * @pre `decimation_filter_set_sample_rate(sr)` has been called wiht the desired sample rate `sr`
  *
  * @param src_384kHz the source buffer to downsample. It is expected that this is the 384kHz buffer with  the correct
  * endianness for the final wav files filled with samples from the ADC via DMA. The samples contained in this buffer
@@ -38,8 +42,6 @@ void decimation_filter_init();
  * @param src_len_in_bytes the length of the source buffer in bytes
  *
  * @param dest the destination buffer for the downsampled data. Must be long enough to hold the downsampled data.
- *
- * @param dest_sample_rate the enumerated sample rate to use for the downsampled data.
  *
  * @param dest_bit_depth the enumerated bit depth to use for the downsampled data
  *
@@ -51,7 +53,6 @@ uint32_t decimation_filter_downsample(
     uint8_t *src_384kHz,
     uint32_t src_len_in_bytes,
     uint8_t *dest,
-    Wave_Header_Sample_Rate_t dest_sample_rate,
     Wave_Header_Bits_Per_Sample_t dest_bit_depth);
 
 #endif /* DECIMATION_FILTER_H_ */

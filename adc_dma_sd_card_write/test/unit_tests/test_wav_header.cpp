@@ -42,7 +42,7 @@ TEST(TestWavHeader, header_length_is_44_bytes)
     ASSERT_EQ(wav_header_get_header_length(), 44);
 }
 
-TEST(TestWavHeader, string_RIFF_is_at_the_start)
+TEST(WavHeaderTest, string_RIFF_is_at_the_start)
 {
     ASSERT_EQ(wav_header[POS_START_OF_RIFF + 0], 'R');
     ASSERT_EQ(wav_header[POS_START_OF_RIFF + 1], 'I');
@@ -50,7 +50,7 @@ TEST(TestWavHeader, string_RIFF_is_at_the_start)
     ASSERT_EQ(wav_header[POS_START_OF_RIFF + 3], 'F');
 }
 
-TEST(TestWavHeader, eight_is_subtracted_from_file_len)
+TEST(WavHeaderTest, eight_is_subtracted_from_file_len)
 {
     // just an arbitrary constant where it's easy to see if 8 has been subtracted
     Wave_Header_Attributes_t attr = {.file_length = 12345678};
@@ -61,7 +61,7 @@ TEST(TestWavHeader, eight_is_subtracted_from_file_len)
     ASSERT_EQ(file_len_minus_8, 12345670); // should be 8 smaller than the one we originally set
 }
 
-TEST(TestWavHeader, string_WAVE_is_in_the_right_spot)
+TEST(WavHeaderTest, string_WAVE_is_in_the_right_spot)
 {
     ASSERT_EQ(wav_header[POS_START_OF_WAVE + 0], 'W');
     ASSERT_EQ(wav_header[POS_START_OF_WAVE + 1], 'A');
@@ -69,7 +69,7 @@ TEST(TestWavHeader, string_WAVE_is_in_the_right_spot)
     ASSERT_EQ(wav_header[POS_START_OF_WAVE + 3], 'E');
 }
 
-TEST(TestWavHeader, string_fmt_is_in_the_right_spot)
+TEST(WavHeaderTest, string_fmt_is_in_the_right_spot)
 {
     ASSERT_EQ(wav_header[POS_START_OF_FMT_ + 0], 'f');
     ASSERT_EQ(wav_header[POS_START_OF_FMT_ + 1], 'm');
@@ -77,19 +77,19 @@ TEST(TestWavHeader, string_fmt_is_in_the_right_spot)
     ASSERT_EQ(wav_header[POS_START_OF_FMT_ + 3], ' ');
 }
 
-TEST(TestWavHeader, fmt_chunk_size_is_always_16)
+TEST(WavHeaderTest, fmt_chunk_size_is_always_16)
 {
     const uint32_t fmt_chunk_size = arr_slice_to_u32(wav_header, POS_START_OF_FMT_CHUNK_SIZE);
     ASSERT_EQ(fmt_chunk_size, 16);
 }
 
-TEST(TestWavHeader, fmt_tag_is_always_PCM)
+TEST(WavHeaderTest, fmt_tag_is_always_PCM)
 {
     const uint16_t fmt_tag = arr_slice_to_u16(wav_header, POS_START_OF_FMT_TAG);
     ASSERT_EQ(fmt_tag, 1); // 1 means PCM, other integer values represent other formats which we don't use
 }
 
-TEST(TestWavHeader, num_channels_can_be_set)
+TEST(WavHeaderTest, num_channels_can_be_set)
 {
     Wave_Header_Attributes_t attr = {.num_channels = WAVE_HEADER_MONO};
     wav_header_set_attributes(&attr);
@@ -104,7 +104,7 @@ TEST(TestWavHeader, num_channels_can_be_set)
     ASSERT_EQ(num_channels, 2);
 }
 
-TEST(TestWavHeader, sample_rate_can_be_set)
+TEST(WavHeaderTest, sample_rate_can_be_set)
 {
     Wave_Header_Attributes_t attr = {.sample_rate = WAVE_HEADER_SAMPLE_RATE_16kHz};
 
@@ -126,7 +126,7 @@ TEST(TestWavHeader, sample_rate_can_be_set)
     ASSERT_EQ(sample_rate, 384000);
 }
 
-TEST(TestWavHeader, bytes_per_sec_is_calculated_and_set)
+TEST(WavHeaderTest, bytes_per_sec_is_calculated_and_set)
 {
     // bytes per second depends on the num channels, the bit depth, and sample rate
     Wave_Header_Attributes_t attr = {
@@ -147,7 +147,7 @@ TEST(TestWavHeader, bytes_per_sec_is_calculated_and_set)
     ASSERT_EQ(bytes_per_sec, (1 * 24 * 384000) / 8);
 }
 
-TEST(TestWavHeader, bytes_per_block_is_calculated_and_set)
+TEST(WavHeaderTest, bytes_per_block_is_calculated_and_set)
 {
     // bytes per block relies on num channels and bit depth
     Wave_Header_Attributes_t attr = {
@@ -172,7 +172,7 @@ TEST(TestWavHeader, bytes_per_block_is_calculated_and_set)
     ASSERT_EQ(bytes_per_block, 1 * 3);
 }
 
-TEST(TestWavHeader, bits_per_sample_is_set)
+TEST(WavHeaderTest, bits_per_sample_is_set)
 {
     Wave_Header_Attributes_t attr = {.bits_per_sample = WAVE_HEADER_16_BITS_PER_SAMPLE};
     wav_header_set_attributes(&attr);
@@ -187,7 +187,7 @@ TEST(TestWavHeader, bits_per_sample_is_set)
     ASSERT_EQ(bits_per_samp, 24);
 }
 
-TEST(TestWavHeader, string_data_is_in_the_right_spot)
+TEST(WavHeaderTest, string_data_is_in_the_right_spot)
 {
     ASSERT_EQ(wav_header[POS_START_OF_DATA_STR + 0], 'd');
     ASSERT_EQ(wav_header[POS_START_OF_DATA_STR + 1], 'a');
@@ -195,7 +195,7 @@ TEST(TestWavHeader, string_data_is_in_the_right_spot)
     ASSERT_EQ(wav_header[POS_START_OF_DATA_STR + 3], 'a');
 }
 
-TEST(TestWavHeader, data_size_does_not_include_header_len)
+TEST(WavHeaderTest, data_size_does_not_include_header_len)
 {
     /**
      * When we set the file length field, this is the length of the whole file including the header itself. This is

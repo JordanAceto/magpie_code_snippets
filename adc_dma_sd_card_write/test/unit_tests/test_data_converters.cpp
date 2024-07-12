@@ -10,7 +10,7 @@ extern "C"
 
 using namespace testing;
 
-TEST(TestDataConverters, i24_swap_endianness_smallest_chunk_check_all_bytes)
+TEST(DataConvertersTest, i24_swap_endianness_smallest_chunk_check_all_bytes)
 {
     // the smallest valid chunk is 12 bytes, which is four 24 bit samples
     uint8_t src[DATA_CONVERTERS_I24_SMALLEST_VALID_CHUNK_SIZE] = {
@@ -30,7 +30,7 @@ TEST(TestDataConverters, i24_swap_endianness_smallest_chunk_check_all_bytes)
                           0xBB, 0xAA, 0x99));
 }
 
-TEST(TestDataConverters, i24_swap_endianness_check_sample_in_the_middle)
+TEST(DataConvertersTest, i24_swap_endianness_check_sample_in_the_middle)
 {
     // arbitrary number of samples to check, note that the num samples must be a multiple of 4
     const uint8_t num_samps = 16;
@@ -57,7 +57,7 @@ TEST(TestDataConverters, i24_swap_endianness_check_sample_in_the_middle)
     ASSERT_EQ(dest[idx_to_check + 2], idx_to_check);     // arb sample byte 2
 }
 
-TEST(TestDataConverters, i24_swap_endianness_should_not_go_past_array_end)
+TEST(DataConvertersTest, i24_swap_endianness_should_not_go_past_array_end)
 {
     uint8_t src[DATA_CONVERTERS_I24_SMALLEST_VALID_CHUNK_SIZE + DATA_CONVERTERS_I24_SIZE_IN_BYTES] = {
         0x00, 0x11, 0x22,
@@ -79,7 +79,7 @@ TEST(TestDataConverters, i24_swap_endianness_should_not_go_past_array_end)
     ASSERT_EQ(dest[14], 0x0D); // <- these should not be swapped
 }
 
-TEST(TestDataConverters, i24_to_q15_smallest_chunk_check_all_bytes)
+TEST(DataConvertersTest, i24_to_q15_smallest_chunk_check_all_bytes)
 {
     // the smallest valid chunk is 12 bytes, which is four 24 bit samples
     uint8_t src[DATA_CONVERTERS_I24_SMALLEST_VALID_CHUNK_SIZE] = {
@@ -99,7 +99,7 @@ TEST(TestDataConverters, i24_to_q15_smallest_chunk_check_all_bytes)
                           0xBBAA));
 }
 
-TEST(TestDataConverters, i24_to_q15_check_sample_in_the_middle)
+TEST(DataConvertersTest, i24_to_q15_check_sample_in_the_middle)
 {
     // arbitrary number of samples to check, note that the num samples must be a multiple of 4
     const uint8_t num_samps = 16;
@@ -127,7 +127,7 @@ TEST(TestDataConverters, i24_to_q15_check_sample_in_the_middle)
     ASSERT_EQ(dest[sample_to_check], expected);
 }
 
-TEST(TestDataConverters, i24_to_q15_should_not_go_past_array_end)
+TEST(DataConvertersTest, i24_to_q15_should_not_go_past_array_end)
 {
     uint8_t src[DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES + DATA_CONVERTERS_I24_SIZE_IN_BYTES] = {
         0x00, 0x01, 0x02,
@@ -144,7 +144,7 @@ TEST(TestDataConverters, i24_to_q15_should_not_go_past_array_end)
     ASSERT_EQ(dest[4], 42);
 }
 
-TEST(TestDataConverters, i24_to_q31_with_endian_swap_smallest_chunk_check_all_bytes)
+TEST(DataConvertersTest, i24_to_q31_with_endian_swap_smallest_chunk_check_all_bytes)
 {
     // the smallest valid chunk is 12 bytes, which is four 24 bit samples which will be expanded into 4 32 bit words
     uint8_t src[DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES] = {
@@ -164,7 +164,7 @@ TEST(TestDataConverters, i24_to_q31_with_endian_swap_smallest_chunk_check_all_by
                           0xAABBCC00));
 }
 
-TEST(TestDataConverters, i24_to_q31_with_endian_swap_check_sample_in_the_middle)
+TEST(DataConvertersTest, i24_to_q31_with_endian_swap_check_sample_in_the_middle)
 {
     // arbitrary number of samples to check, note that the num samples must be a multiple of 4
     const uint8_t num_samps = 16;
@@ -193,7 +193,7 @@ TEST(TestDataConverters, i24_to_q31_with_endian_swap_check_sample_in_the_middle)
     ASSERT_EQ(dest[sample_to_check], expected);
 }
 
-TEST(TestDataConverters, i24_to_q31_with_endian_swap_should_not_go_past_array_end)
+TEST(DataConvertersTest, i24_to_q31_with_endian_swap_should_not_go_past_array_end)
 {
     uint8_t src[DATA_CONVERTERS_Q31_AND_I24_LCM_IN_BYTES + DATA_CONVERTERS_I24_SIZE_IN_BYTES] = {
         0x00, 0x01, 0x02,
@@ -210,7 +210,7 @@ TEST(TestDataConverters, i24_to_q31_with_endian_swap_should_not_go_past_array_en
     ASSERT_EQ(dest[4], 42);
 }
 
-TEST(TestDataConverters, q31_to_i24_smallest_chunk_check_all_bytes)
+TEST(DataConvertersTest, q31_to_i24_smallest_chunk_check_all_bytes)
 {
     // the smallest valid chunk is four q31 words, which is four 32 bit samples which will be crammed into 12 bytes
     const uint32_t src_len_in_samps = 4;
@@ -231,7 +231,7 @@ TEST(TestDataConverters, q31_to_i24_smallest_chunk_check_all_bytes)
                           0xDD, 0xEE, 0xFF));
 }
 
-TEST(TestDataConverters, q31_to_i24_check_sample_in_the_middle)
+TEST(DataConvertersTest, q31_to_i24_check_sample_in_the_middle)
 {
     // arbitrary number of samples to check, note that the num samples must be a multiple of 3 (bytes % 12 = 0)
     const uint32_t num_samps = 18;
@@ -256,7 +256,7 @@ TEST(TestDataConverters, q31_to_i24_check_sample_in_the_middle)
     ASSERT_EQ(actual, expected);
 }
 
-TEST(TestDataConverters, q31_to_i24_should_not_go_past_array_end)
+TEST(DataConvertersTest, q31_to_i24_should_not_go_past_array_end)
 {
     q31_t src[5] = {
         0x03020100,

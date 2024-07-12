@@ -11,8 +11,9 @@ TEST_REPORT = test_results.xml
 
 # add new test files and helper .cpp files here
 TEST_SRC_FILES  = test_helpers.cpp \
-	test_data_converters.cpp       \
-	test_wav_header.cpp            \
+	test_data_converters.cpp \
+	test_wav_header.cpp \
+	test_decimation_filter.cpp \
 
 TEST_OBJS = $(TEST_SRC_FILES:.cpp=.o)
 
@@ -20,12 +21,15 @@ FILES_UNDER_TEST_INC_DIR = ../../
 
 # add new .c files under test here
 SRC_FILES_TO_TEST  = $(FILES_UNDER_TEST_INC_DIR)data_converters.c \
-	$(FILES_UNDER_TEST_INC_DIR)wav_header.c
+	$(FILES_UNDER_TEST_INC_DIR)wav_header.c \
+	$(FILES_UNDER_TEST_INC_DIR)decimation_filter.c \
+	$(FILES_UNDER_TEST_INC_DIR)arm_fir_decimate_fast_q31_bob.c
 
 HEADER_OVERRIDE_DIR = ./header_overrides/
 
 # add new override source .c files as needed here
-OVERRIDE_SRCS  = 
+OVERRIDE_SRCS  = $(HEADER_OVERRIDE_DIR)arm_fir_decimate_init_q31.c \
+	$(HEADER_OVERRIDE_DIR)arm_q31_to_q15.c
 
 OBJS_UNDER_TEST  = $(notdir $(SRC_FILES_TO_TEST:.c=.o)) \
 	$(notdir $(OVERRIDE_SRCS:.c=.o))

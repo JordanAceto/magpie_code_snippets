@@ -37,7 +37,7 @@
 
 // the threshold for triggering a DMA request
 #define DMA_SPI_RX_THRESHOLD (DATA_CONVERTERS_I24_SIZE_IN_BYTES * 8)
-\
+
 // the SPI bus to use to read audio samples from the ADC
 #define DATA_SPI_BUS (MXC_SPI1)
 

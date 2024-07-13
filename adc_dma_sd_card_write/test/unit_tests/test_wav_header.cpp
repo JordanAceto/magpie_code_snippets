@@ -37,7 +37,7 @@ enum Wave_Header_Position_t
 // a handle to the wav header so we can use a slightly shorter name in the code
 static char *wav_header = wav_header_get_header();
 
-TEST(TestWavHeader, header_length_is_44_bytes)
+TEST(WavHeaderTest, header_length_is_44_bytes)
 {
     ASSERT_EQ(wav_header_get_header_length(), 44);
 }

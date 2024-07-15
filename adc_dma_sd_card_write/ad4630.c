@@ -235,6 +235,9 @@ AD4630_Error_t ad4630_init()
         return AD4630_ERROR_CONFIG_ERROR;
     }
 
+    // we need to re-initialize the clock enable pin, because the config is overwritten when we init SPI1
+    MXC_GPIO_Config(&adc_clk_en_pin);
+
     ad4630_cont_conversions_stop();
 
     return AD4630_ERROR_ALL_OK;

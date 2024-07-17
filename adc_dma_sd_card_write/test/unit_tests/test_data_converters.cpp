@@ -79,6 +79,10 @@ TEST(DataConvertersTest, i24_swap_endianness_should_not_go_past_array_end)
     ASSERT_EQ(dest[14], 0x0D); // <- these should not be swapped
 }
 
+// TEST(DataConvertersTest, i14_swap_endianness_works_in_place)
+// {
+// }
+
 TEST(DataConvertersTest, i24_to_q15_smallest_chunk_check_all_bytes)
 {
     // the smallest valid chunk is 12 bytes, which is four 24 bit samples
@@ -274,4 +278,99 @@ TEST(DataConvertersTest, q31_to_i24_should_not_go_past_array_end)
     ASSERT_EQ(dest[13], 0);
     ASSERT_EQ(dest[14], 0);
     ASSERT_EQ(dest[15], 0);
+}
+
+TEST(DataConvertersTest, q31_to_i24_works_in_place)
+{
+    const uint32_t src_len_in_samps = 4;
+    q31_t src[src_len_in_samps] = {
+        0x33221100,
+        0x77665544,
+        0xBBAA9988,
+        0xFFEEDDCC};
+
+    data_converters_q31_to_i24(src, (uint8_t *)src, src_len_in_samps);
+
+    // the three 32-bit words of src now contain four 24-bit truncated samples
+    ASSERT_EQ(src[0], 0x55332211);
+    ASSERT_EQ(src[1], 0xAA997766);
+    ASSERT_EQ(src[2], 0xFFEEDDBB);
+}
+
+TEST(DataConvertersTest, q31_to_q15_smallest_chunk_check_all_bytes)
+{
+    // the smallest valid chunk is four q31 words, which is four 32 bit samples which will be crammed into 12 bytes
+    const uint32_t src_len_in_samps = 4;
+    q31_t src[src_len_in_samps] = {
+        0x33221100,
+        0x77665544,
+        0xBBAA9988,
+        0xFFEEDDCC};
+
+    q15_t dest[src_len_in_samps] = {0};
+
+    data_converters_q31_to_q15(src, dest, src_len_in_samps);
+
+    ASSERT_THAT(dest, ElementsAre(
+                          0x3322,
+                          0x7766,
+                          0xBBAA,
+                          0xFFEE));
+}
+
+TEST(DataConvertersTest, q31_to_q15_check_sample_in_the_middle)
+{
+    // arbitrary number of samples to check, note that the num samples must be a multiple of 3 (bytes % 12 = 0)
+    const uint32_t num_samps = 42;
+
+    q31_t src[num_samps];
+    q15_t dest[num_samps];
+
+    // check an arbitrary sample in the middle
+    const uint32_t samp_to_check = 17;
+    const uint32_t dest_idx_to_check = samp_to_check;
+
+    // set the value to an arbitrary value
+    const uint32_t arb_val_big_enough_to_be_non_zero_when_shifted = 0x42424242;
+    src[samp_to_check] = arb_val_big_enough_to_be_non_zero_when_shifted;
+
+    data_converters_q31_to_q15(src, dest, num_samps);
+
+    ASSERT_EQ(src[samp_to_check] >> 16, dest[samp_to_check]);
+}
+
+TEST(DataConvertersTest, q31_to_q15_should_not_go_past_array_end)
+{
+    q31_t src[5] = {
+        0x03020100,
+        0x07060504,
+        0x0B0A0908,
+        0x0F0E0D0C,
+        0x12345678};               // this last word should not be copied into the destination array
+    uint32_t src_len_in_samps = 4; // because the length here says to stop at 4 sample
+
+    q15_t dest[8] = {0};
+
+    data_converters_q31_to_q15(src, dest, src_len_in_samps);
+
+    ASSERT_EQ(dest[4], 0); // everything past here should still be zero'd out
+    ASSERT_EQ(dest[5], 0);
+    ASSERT_EQ(dest[6], 0);
+    ASSERT_EQ(dest[7], 0);
+}
+
+TEST(DataConvertersTest, q31_to_q15_works_in_place)
+{
+    const uint32_t src_len_in_samps = 4;
+    q31_t src[src_len_in_samps] = {
+        0x33221100,
+        0x77665544,
+        0xBBAA9988,
+        0xFFEEDDCC};
+
+    data_converters_q31_to_q15(src, (q15_t *)src, src_len_in_samps);
+
+    // the first two 32-bit words of src now contain four 16-bit truncated samples
+    ASSERT_EQ(src[0], 0x77663322);
+    ASSERT_EQ(src[1], 0xFFEEBBAA);
 }

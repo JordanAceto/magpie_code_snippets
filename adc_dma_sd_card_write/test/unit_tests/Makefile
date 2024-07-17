@@ -28,8 +28,7 @@ SRC_FILES_TO_TEST  = $(FILES_UNDER_TEST_INC_DIR)data_converters.c \
 HEADER_OVERRIDE_DIR = ./header_overrides/
 
 # add new override source .c files as needed here
-OVERRIDE_SRCS  = $(HEADER_OVERRIDE_DIR)arm_fir_decimate_init_q31.c \
-	$(HEADER_OVERRIDE_DIR)arm_q31_to_q15.c
+OVERRIDE_SRCS  = $(HEADER_OVERRIDE_DIR)arm_fir_decimate_init_q31.c
 
 OBJS_UNDER_TEST  = $(notdir $(SRC_FILES_TO_TEST:.c=.o)) \
 	$(notdir $(OVERRIDE_SRCS:.c=.o))

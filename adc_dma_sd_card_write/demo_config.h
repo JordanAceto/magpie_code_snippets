@@ -16,9 +16,8 @@
 // max value 4k seconds, about 70 minutes (we will remove this limitation in the final code, limited for the demo for simplicity).
 #define DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS (5)
 
-#define DEMO_CONFIG_NUM_SAMPLE_RATES_TO_TEST (7)
-
-const Wave_Header_Sample_Rate_t demo_sample_rates_to_test[DEMO_CONFIG_NUM_SAMPLE_RATES_TO_TEST] = {
+// comment or uncomment sample rates to add them to the test
+const Wave_Header_Sample_Rate_t demo_sample_rates_to_test[] = {
     WAVE_HEADER_SAMPLE_RATE_16kHz,
     WAVE_HEADER_SAMPLE_RATE_24kHz,
     WAVE_HEADER_SAMPLE_RATE_32kHz,
@@ -28,11 +27,14 @@ const Wave_Header_Sample_Rate_t demo_sample_rates_to_test[DEMO_CONFIG_NUM_SAMPLE
     WAVE_HEADER_SAMPLE_RATE_384kHz,
 };
 
-#define DEMO_CONFIG_NUM_BIT_DEPTHS_TO_TEST (2)
+const uint32_t DEMO_CONFIG_NUM_SAMPLE_RATES_TO_TEST = sizeof(demo_sample_rates_to_test) / sizeof(demo_sample_rates_to_test[0]);
 
-const Wave_Header_Bits_Per_Sample_t demo_bit_depths_to_test[DEMO_CONFIG_NUM_BIT_DEPTHS_TO_TEST] = {
+// comment or uncomment bit depths to add them to the test
+const Wave_Header_Bits_Per_Sample_t demo_bit_depths_to_test[] = {
     WAVE_HEADER_16_BITS_PER_SAMPLE,
     WAVE_HEADER_24_BITS_PER_SAMPLE,
 };
+
+const uint32_t DEMO_CONFIG_NUM_BIT_DEPTHS_TO_TEST = sizeof(demo_bit_depths_to_test) / sizeof(demo_bit_depths_to_test[0]);
 
 #endif /* DEMO_CONFIG_H_ */

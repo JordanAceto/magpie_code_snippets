@@ -109,7 +109,8 @@ uint32_t data_converters_i24_to_q15(uint8_t *src, q15_t *dest, uint32_t src_len_
 
 /**
  * @brief `data_converters_q31_to_i24(s, d, l)` converts `l` samples from source array `s` of q31s to 24 bit signed
- * ints and stores them in destination array `d`
+ * ints and stores them in destination array `d`. This function can work in-place if the same pointer is passed as `s`
+ * and `d` with `d` cast to a (uint8_t *).
  *
  * @param src the source array of q31 samples, must be at least `l` words long
  *
@@ -138,7 +139,8 @@ uint32_t data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_
 
 /**
  * @brief `data_converters_q31_to_q15(s, d, l)` converts `l` samples from source array `s` of q31s to q15s and stores
- * them in destination array `d`
+ * them in destination array `d`. This function can work in-place if the same pointer is passed as `s` and `d` with
+ * `d` cast to a (q15_t *).
  *
  * @param src the source array of q31 samples, must be at least `l` words long
  *

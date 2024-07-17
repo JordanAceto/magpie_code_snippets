@@ -285,7 +285,7 @@ void DMA0_IRQHandler()
     }
     else // it must be 32 bit wide samples
     {
-        data_converters_i24_to_q31_with_endian_swap(dmaDestBuff, bigDMAbuff + offsetDMA, audio_dma_buffer_size_in_bytes());
+        data_converters_i24_to_q31_with_endian_swap(dmaDestBuff, (q31_t *)(bigDMAbuff + offsetDMA), audio_dma_buffer_size_in_bytes());
     }
 
     blockPtrModuloDMA = (blockPtrModuloDMA + 1) & (DMA_NUM_STALLS_ALLOWED - 1);

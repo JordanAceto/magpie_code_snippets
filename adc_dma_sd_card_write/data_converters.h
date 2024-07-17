@@ -136,4 +136,32 @@ uint32_t data_converters_i24_to_q15(uint8_t *src, q15_t *dest, uint32_t src_len_
  */
 uint32_t data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_in_samps);
 
+/**
+ * @brief `data_converters_q31_to_q15(s, d, l)` converts `l` samples from source array `s` of q31s to q15s and stores
+ * them in destination array `d`
+ *
+ * @param src the source array of q31 samples, must be at least `l` words long
+ *
+ * @param dest the destination array for the truncated q15 samples, must be at least (src_len_in_samps / 2) long
+ *
+ * @param src_len_in_samps the length of the source array in samples, not bytes, must be a multiple of 4
+ *
+ * @retval the length of the data transferred to the dest buffer in bytes
+ *
+ * @post the destination array `d` is filled with the 32 bit samples from `s` truncated to take up 16 bits.
+ *
+ * Example:
+ * The below diagram shows 4 32 bit samples truncated down to 4 24 bit samples. The numbers given to the positions
+ * are only to help keep track of the various bytes. We start with 4 32 bit samples taking up 4 words, and finish
+ * with 4 24 bit samples taking up 3 words. For each 32 bit input sample, we truncate the least significant byte
+ * and shuffle the rest of the bytes to take up the least possible space.
+ *
+ *  0F 0E 0D 0C, 0B 0A 09 08, 07 06 05 04, 03 02 01 00  <- src buffer, one chunk shown
+ * |------------|------------|------------|-----------| <- demarcation of the four 32 bit input samples
+ *
+ *                            0F 0E 0B 0A, 07 06 03 02  <- dest buffer, one chunk shown
+ *                           |-----|------|-----|-----| <- demarcation of the four 16 bit truncated samples, split across the 32 bit words
+ */
+uint32_t data_converters_q31_to_q15(q31_t *src, q15_t *dest, uint32_t src_len_in_samps);
+
 #endif /* DATA_CONVERTERS_H_ */

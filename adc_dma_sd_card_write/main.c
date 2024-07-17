@@ -157,8 +157,8 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
     }
 
     // 384kHz is a special case where we take 24 bit samples from the DMA, for all other sample rates we want 32 bit samples
-    audio_dma_set_sample_width(
-        wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz ? AUDIO_DMA_SAMPLE_WIDTH_24_BITS : AUDIO_DMA_SAMPLE_WIDTH_32_BITS);
+    const Audio_DMA_Sample_Width_t sample_width = wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz ? AUDIO_DMA_SAMPLE_WIDTH_24_BITS : AUDIO_DMA_SAMPLE_WIDTH_32_BITS;
+    audio_dma_set_sample_width(sample_width);
 
     decimation_filter_set_sample_rate(wav_attr->sample_rate);
 
@@ -176,15 +176,47 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
         {
             MXC_TMR_SW_Start(MXC_TMR1); // for profiling the time it takes to filter and write out the buffer
 
-            const uint32_t downsampled_buff_len = decimation_filter_downsample(
-                audio_dma_consume_buffer(),
-                audio_dma_buffer_size_in_bytes(),
-                downsampled_audio,
-                wav_attr->bits_per_sample);
-
-            if (sd_card_fwrite(downsampled_audio, downsampled_buff_len, &bytes_written) != SD_CARD_ERROR_ALL_OK)
+            if (wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz)
             {
-                error_handler(LED_COLOR_RED);
+                if (wav_attr->bits_per_sample == WAVE_HEADER_24_BITS_PER_SAMPLE)
+                {
+                    if (sd_card_fwrite(audio_dma_consume_buffer(), audio_dma_buffer_size_in_bytes(), &bytes_written) != SD_CARD_ERROR_ALL_OK)
+                    {
+                        error_handler(LED_COLOR_RED);
+                    }
+                }
+                else // it must be 16 bits
+                {
+                    const uint32_t len_in_bytes = data_converters_i24_to_q15(audio_dma_consume_buffer(), (q15_t *)downsampled_audio, audio_dma_buffer_size_in_bytes());
+
+                    if (sd_card_fwrite(downsampled_audio, len_in_bytes, &bytes_written) != SD_CARD_ERROR_ALL_OK)
+                    {
+                        error_handler(LED_COLOR_RED);
+                    }
+                }
+            }
+            else // it's not the special case of 384kHz, all other sample rates are filtered
+            {
+                const uint32_t len_in_samps = decimation_filter_downsample(
+                    (q31_t *)audio_dma_consume_buffer(),
+                    (q31_t *)downsampled_audio,
+                    audio_dma_buffer_size_in_bytes() / 4); // we want num samples, not num bytes
+
+                uint32_t len_in_bytes;
+
+                if (wav_attr->bits_per_sample == WAVE_HEADER_24_BITS_PER_SAMPLE)
+                {
+                    len_in_bytes = data_converters_q31_to_i24((q31_t *)downsampled_audio, downsampled_audio, len_in_samps);
+                }
+                else // it's 16 bits
+                {
+                    len_in_bytes = data_converters_q31_to_q15((q31_t *)downsampled_audio, (q15_t *)downsampled_audio, len_in_samps);
+                }
+
+                if (sd_card_fwrite(downsampled_audio, len_in_bytes, &bytes_written) != SD_CARD_ERROR_ALL_OK)
+                {
+                    error_handler(LED_COLOR_RED);
+                }
             }
 
             const uint32_t time_to_filter_and_write_the_block = MXC_TMR_SW_Stop(MXC_TMR1);

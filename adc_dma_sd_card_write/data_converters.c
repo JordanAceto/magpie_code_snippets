@@ -190,3 +190,40 @@ uint32_t data_converters_q31_to_i24(q31_t *src, uint8_t *dest, uint32_t src_len_
 
     return src_len_in_samps * DATA_CONVERTERS_I24_SIZE_IN_BYTES;
 }
+
+uint32_t data_converters_q31_to_q15(q31_t *src, q15_t *dest, uint32_t src_len_in_samps)
+{
+    /**
+     * Convert an array of q31's into an array of 16 bit integers by processing chunks of 4 samples at a time.
+     * Each chunk: 16 bytes in, 8 bytes out.
+     * This is more efficient than a naive for-loop. An equivalent for-loop is shown below (commented out) for clarity.
+     */
+
+    // for (uint32_t i = 0; i < src_len_in_samps; i++)
+    // {
+    //     dest[i] = src[i] >> 16;
+    // }
+
+    q31_t in1, in2, in3, in4;
+    q31_t out1, out2;
+
+    uint32_t block_count = src_len_in_samps >> 2;
+
+    while (block_count > 0)
+    {
+        in1 = *src++;
+        in2 = *src++;
+        in3 = *src++;
+        in4 = *src++;
+
+        out1 = (in2 & 0xFFFF0000) | ((in1 >> 16) & 0x0000FFFF);
+        out2 = (in4 & 0xFFFF0000) | ((in3 >> 16) & 0x0000FFFF);
+
+        *__SIMD32(dest)++ = out1;
+        *__SIMD32(dest)++ = out2;
+
+        block_count--;
+    }
+
+    return src_len_in_samps * DATA_CONVERTERS_Q15_SIZE_IN_BYTES;
+}

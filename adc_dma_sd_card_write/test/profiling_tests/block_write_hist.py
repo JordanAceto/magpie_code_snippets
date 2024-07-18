@@ -1,5 +1,15 @@
+import argparse
 import matplotlib.pyplot as plt
 import pandas as pd
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "plot_details",
+    type=str,
+    help="Details to add to the title of the generated plot",
+)
+
+args = parser.parse_args()
 
 df = pd.read_csv("block_write_times_microsec.csv").transpose().reset_index()
 df.columns = df.iloc[0]
@@ -26,7 +36,7 @@ num_bit_depths = 2
 fig, axs = plt.subplots(num_sample_rates, num_bit_depths)
 
 fig.suptitle(
-    f"Histogram of filter & SD card write time, {df.shape[0]} blocks each, relaxed 192k, no 1/2 band filters"
+    f"Histogram of filter & SD card write time, {df.shape[0]} blocks each. {args.plot_details}"
 )
 
 for ax, col in zip(axs[0], ["16 bit", "24 bit"]):

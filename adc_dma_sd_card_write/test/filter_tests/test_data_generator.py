@@ -2,57 +2,65 @@ import config
 import numpy as np
 
 
-def generate_test_sig_with_approx_freqs(
-    freqs: list[float],
-    weights: list[float],
-    num_samps: int,
-) -> tuple[np.array, np.array]:
+def snap_freq_to_DMA_buff_multiple(freq):
     """
-    `generate_test_sig_with_approx_freqs(fs, ws, n)` is the (x, y) pair of numpy arrays representing a test signal of 1 or
-    more sine componets. The x array represents the linear inputs, and the y array represents the actual sine components.
-
-    Each frequency in the list of frequencies `fs` is snapped to a nearby frequency that evenly fits into the DMA
-    buffer length defined in config.h, this means that the resulting test signal will be continuous across DMA block
-    boundaries. Each frequency component is scaled by the weight in `ws` with the matching index.
-
-    Very low frequencies (below about 50Hz) will round down to zero Hz.
-
-    The final numpy array is normalized to the range [-1, +1]
-
-    The sample rate and DMA buffer length defined in config.py influence the final result.
-
-    Keyword arguments:
-    freqs -- the list of frequencies to include in the test signal, frequencies may be slightly adjusted from the given values
-    weights -- the weights to apply to each frequency component
-    num_samps -- the length of the resulting array
-
-    Raises:
-    An exception if the lengths of `fs` and `ws` are not the same
-
-    Examples:
-    >>> x, y = generate_test_sig_with_approx_freqs(freqs=[1e3, 50e3, 120e3], weights=[1, 0.02, 0.01], num_samps=8256)
-    >>> plt.plot(x, y)
-    >>> plt.show()
-
-    results in a numpy array with weighted sine components of approximately 1kHz, 50kHz, and 120kHz
+    `snap_freq_to_DMA_buff_multiple(f)` is a frequency close to `f` that fits into the DMA buffer such that it is
+    continuous across DMA buffer boundaries. Very low frequencies below about 50Hz will be rounded down to zero Hz.
     """
-    if len(freqs) != len(weights):
-        raise Exception("Length of frequency and weights arrays must be identical")
 
     # all exact multiples of df will be continuous across the block boundary
     df = config.BASE_SAMPLE_RATE / config.DMA_SIZE_IN_SAMPS
+    snapped_freq = df * (freq // df)
+    return snapped_freq
+
+
+def generate_test_sig(sample_rate, num_samps, include_sig_at_passband_edge=True):
+    """
+    `generate_test_sig(sr, n, pb)` is a numpy array filled with sine components for use as a test signal for the
+    decimation filters. The test array has a reference sine component at 1kHz, and a swarm of out of band components.
+    An optional signal right at the passband edge can be included as well.
+    """
+    # due to the way the decimation filters are coded
+    fpass = sample_rate * 5 / 12
+    fstop = sample_rate - fpass
 
     x = np.arange(num_samps)
 
-    y = np.zeros(num_samps)
+    # a reference sine at 1kHz
+    vin_1k = np.sin(
+        2 * np.pi * x * snap_freq_to_DMA_buff_multiple(1e3) / config.BASE_SAMPLE_RATE
+    )
 
-    for i in range(len(freqs)):
-        # the actual frequency is nudged so that it fits in a multiple of the DMA block size
-        actual_f = df * (freqs[i] // df)
+    # multiple out-of-band sine components
+    vin_out_of_band = np.zeros(num_samps)
+    for f in range(int(fstop + 2e3), int(192e3), int(1e3)):
+        vin_out_of_band = vin_out_of_band + np.sin(
+            (
+                2
+                * np.pi
+                * x
+                * snap_freq_to_DMA_buff_multiple(f)
+                / config.BASE_SAMPLE_RATE
+            )
+            # since all components align to DMA block boundary, add some random phase shift
+            # so the time-domain signals don't all hit zero volts at the exact same instant
+            + ((np.random.random_sample() - 0.5) * 4 * np.pi)
+        )
+    vin_out_of_band = vin_out_of_band / max(abs(vin_out_of_band))
 
-        y += weights[i] * np.sin(2 * np.pi * x * actual_f / config.BASE_SAMPLE_RATE)
+    test_data = vin_1k + vin_out_of_band
 
-    # scale to be between [-1, +1]
-    y = y / np.max(abs(y))
+    if include_sig_at_passband_edge:
+        # a sine component right at the passband edge
+        vin_at_passband_edge = np.sin(
+            2
+            * np.pi
+            * x
+            * snap_freq_to_DMA_buff_multiple(fpass)
+            / config.BASE_SAMPLE_RATE
+        )
+        test_data += vin_at_passband_edge
 
-    return x, y
+    test_data = test_data / max(abs(test_data))
+
+    return test_data

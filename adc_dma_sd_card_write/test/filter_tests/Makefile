@@ -26,6 +26,6 @@ clean:
 	rm -rf $(BUILD_DIR)
 	rm -f $(OUT_DIR)*.wav
 
-# usage: make plot SR=<sample rate in kHz>, example: make plot SR=96
+# usage: make plot SR=<sample rate in kHz> PB=<n>, example: make plot SR=96 PB=1
 plot: $(C_LIB)
-	python filter_test_main.py $(C_LIB) $(SR)
+	python filter_test_main.py $(C_LIB) $(SR) $(PB)

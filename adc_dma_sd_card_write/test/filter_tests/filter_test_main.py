@@ -5,7 +5,7 @@ import numpy as np
 import scipy
 
 from plots import plot_decimation_comparison
-from test_data_generator import generate_test_sig_with_approx_freqs
+from test_data_generator import generate_test_sig
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -18,6 +18,11 @@ parser.add_argument(
     type=int,
     help="The sample rate in kHz, ex: 192 => 192kHz",
     choices={16, 24, 32, 48, 96, 192},
+)
+parser.add_argument(
+    "test_pb",
+    type=int,
+    help="Boolean signal, 1 to include a sine component right at the passband, 0 to leave it out",
 )
 
 args = parser.parse_args()
@@ -33,17 +38,18 @@ clib.decimation_filter_downsample.argtypes = [
 ]
 clib.decimation_filter_downsample.restype = ctypes.c_uint
 
-raw_x, raw_y = generate_test_sig_with_approx_freqs(
-    freqs=[1e3, 50e3, 120e3, 170e3],
-    weights=[1, 0.4, 0.3, 0.2],
-    num_samps=config.DMA_SIZE_IN_SAMPS,
+
+decimated_sample_rate = int(args.sample_rate * 1000)
+
+raw_y = generate_test_sig(
+    decimated_sample_rate,
+    config.DMA_SIZE_IN_SAMPS,
+    include_sig_at_passband_edge=args.test_pb == 1,
 )
 
 # expand the test data to fill up some of the range of an i32, but don't go all the way to full-scale
 raw_y = raw_y * 2**30
 raw_y = raw_y.astype(np.int32)
-
-decimated_sample_rate = int(args.sample_rate * 1000)
 
 decimation_factor = config.BASE_SAMPLE_RATE / decimated_sample_rate
 

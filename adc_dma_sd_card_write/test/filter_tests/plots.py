@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import scipy
 
 import config
 
@@ -32,14 +31,7 @@ def plot_decimation_comparison(
 
     axs[0, 0].set_title(f"Raw test Data, {int(raw_sample_rate//1000)}kHz, undecimated")
 
-    # nasty expression to extract the lowest peak in the test data, there is probably a tidier way to do this
-    xf = scipy.fftpack.rfftfreq(len(raw_y_), 1 / raw_sample_rate)
-    yf = np.abs(scipy.fftpack.rfft(raw_y_, len(raw_y_)))
-    y_max = max(yf)
-    y_as_db = 20 * np.log10(yf / y_max)
-    lowest_peak = xf[
-        scipy.signal.find_peaks(y_as_db, prominence=1, height=max(y_as_db))[0]
-    ][0]
+    lowest_peak = 1e3
 
     about_3_cycles_of_test_data = raw_y_[: int((raw_sample_rate * 3) / lowest_peak)]
 
@@ -79,8 +71,8 @@ def plot_decimation_comparison(
     axs[1, 1].magnitude_spectrum(decimated_y_, decimated_sample_rate, scale="dB")
     axs[1, 1].set_xlabel("Frequency (Hz)")
     axs[1, 1].xaxis.set_major_formatter(ticker.EngFormatter())
-    # limit the x-range, this is due to the way the decimation filters are coded
-    axs[1, 1].set_xlim(0, decimated_sample_rate * 5 / 12)
+    # limit the x-range, this is due to the way the decimation filters are coded, go just past the passband
+    axs[1, 1].set_xlim(0, decimated_sample_rate * 5 / 12 + 1e3)
     axs[1, 1].set_ylim(-120, 5)
     axs[1, 1].grid(True)
 

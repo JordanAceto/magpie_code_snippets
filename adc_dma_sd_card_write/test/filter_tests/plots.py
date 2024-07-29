@@ -6,33 +6,6 @@ import scipy
 import config
 
 
-def make_fft_plot(
-    y: np.array,
-    sample_rate: int,
-) -> None:
-    """
-    `make_fft_plot(y, sr)` generates an FFT plot of numpy array `y` with sample rate `sr`
-    """
-    xf = scipy.fftpack.rfftfreq(len(y), 1 / sample_rate)
-    yf = np.abs(scipy.fftpack.rfft(y, len(y)))
-
-    y_max = max(yf)
-    y_as_db = 20 * np.log10(yf / y_max)
-
-    _, ax = plt.subplots()
-
-    plt.plot(xf, y_as_db)
-    plt.title(f"FFT with sample rate {int(sample_rate/1000)}kHz")
-    plt.xlabel("Frequency (Hz)")
-
-    ax.xaxis.set_major_formatter(ticker.EngFormatter())
-    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: str(x) + "dB"))
-
-    plt.ylim(-120, 5)
-    plt.grid(True)
-    plt.show()
-
-
 def plot_decimation_comparison(
     raw_y,
     decimated_y,
@@ -106,6 +79,8 @@ def plot_decimation_comparison(
     axs[1, 1].magnitude_spectrum(decimated_y_, decimated_sample_rate, scale="dB")
     axs[1, 1].set_xlabel("Frequency (Hz)")
     axs[1, 1].xaxis.set_major_formatter(ticker.EngFormatter())
+    # limit the x-range, this is due to the way the decimation filters are coded
+    axs[1, 1].set_xlim(0, decimated_sample_rate * 5 / 12)
     axs[1, 1].set_ylim(-120, 5)
     axs[1, 1].grid(True)
 

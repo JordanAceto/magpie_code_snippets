@@ -132,15 +132,17 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
     // a string buffer to write file names into
     static char file_name_buff[64];
 
-    // we'll store the time it takes to write out each block here
-    static uint32_t block_write_time_microsecs[4000] = {0}; // 4k is enough if we stay under 70 seconds
-
-    // for misc SD card writing, a buffer to sprintf into
-    static char str_buff[64] = {0};
-
     // there will be some integer truncation here, good enough for this early demo, but improve file-len code eventually
     const uint32_t file_len_in_microsecs = file_len_secs * 1000000;
     const uint32_t num_dma_blocks_in_the_file = file_len_in_microsecs / AUDIO_DMA_CHUNK_READY_PERIOD_IN_MICROSECS;
+
+#if DEMO_CONFIG_GENERATE_CSV_OF_WRITE_TIMES == 1
+    // for misc SD card writing, a buffer to sprintf into
+    static char str_buff[64] = {0};
+
+    // we'll store the time it takes to write out each block here
+    static uint32_t block_write_time_microsecs[4000] = {0}; // 4k is enough if we stay under 70 seconds
+#endif
 
     // derive the file name from the input parameters
     sprintf(file_name_buff, "demo_%dkHz_%d_bit.wav", wav_attr->sample_rate / 1000, wav_attr->bits_per_sample);
@@ -174,7 +176,9 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
 
         while (audio_dma_num_buffers_available() > 0)
         {
+#if DEMO_CONFIG_GENERATE_CSV_OF_WRITE_TIMES == 1
             MXC_TMR_SW_Start(MXC_TMR1); // for profiling the time it takes to filter and write out the buffer
+#endif
 
             if (wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz)
             {
@@ -219,8 +223,10 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
                 }
             }
 
+#if DEMO_CONFIG_GENERATE_CSV_OF_WRITE_TIMES == 1
             const uint32_t time_to_filter_and_write_the_block = MXC_TMR_SW_Stop(MXC_TMR1);
             block_write_time_microsecs[num_dma_blocks_written] = time_to_filter_and_write_the_block;
+#endif
 
             num_dma_blocks_written += 1;
         }
@@ -248,6 +254,7 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
         error_handler(LED_COLOR_RED);
     }
 
+#if DEMO_CONFIG_GENERATE_CSV_OF_WRITE_TIMES == 1
     // write a file summary of the time taken to filter and write each DMA block
     if (sd_card_fopen("block_write_times_microsec.csv", POSIX_FILE_MODE_APPEND) != SD_CARD_ERROR_ALL_OK)
     {
@@ -274,6 +281,7 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
     {
         error_handler(LED_COLOR_RED);
     }
+#endif
 }
 
 void error_handler(LED_Color_t color)

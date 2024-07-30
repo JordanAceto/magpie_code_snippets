@@ -12,6 +12,9 @@
 
 /* Public defines ----------------------------------------------------------------------------------------------------*/
 
+// set to 1 to generate a CSV file of the durations of each DMA block filter/SD-write event
+#define DEMO_CONFIG_GENERATE_CSV_OF_WRITE_TIMES (0)
+
 // the length of the WAVE file to write to the SD card, a positive integer, long file durations will tale a long time to write
 // max value 4k seconds, about 70 minutes (we will remove this limitation in the final code, limited for the demo for simplicity).
 #define DEMO_CONFIG_AUDIO_FILE_LEN_IN_SECONDS (5)

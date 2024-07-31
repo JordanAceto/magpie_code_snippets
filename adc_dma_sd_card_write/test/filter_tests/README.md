@@ -16,6 +16,7 @@
     - scipy
 - GNU Make to run the Makefile
     - You could run the commands manually as well
+- gcc to compile the C-language decimation filter code
 
 ## To run the script and generate the outputs
 

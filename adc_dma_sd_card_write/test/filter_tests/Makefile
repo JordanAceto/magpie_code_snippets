@@ -9,10 +9,7 @@ OUT_DIR = ./out/
 OVERRIDES_DIR = ../unit_tests/header_overrides/
 
 C_SRC  = $(SRC_DIR)decimation_filter.c
-C_SRC += $(SRC_DIR)arm_fir_decimate_fast_q31_bob.c
 C_SRC += $(SRC_DIR)data_converters.c
-
-C_SRC += $(OVERRIDES_DIR)arm_fir_decimate_init_q31.c
 
 all: $(C_LIB)
 

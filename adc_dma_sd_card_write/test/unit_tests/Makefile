@@ -23,12 +23,11 @@ FILES_UNDER_TEST_INC_DIR = ../../
 SRC_FILES_TO_TEST  = $(FILES_UNDER_TEST_INC_DIR)data_converters.c \
 	$(FILES_UNDER_TEST_INC_DIR)wav_header.c \
 	$(FILES_UNDER_TEST_INC_DIR)decimation_filter.c \
-	$(FILES_UNDER_TEST_INC_DIR)arm_fir_decimate_fast_q31_bob.c
 
 HEADER_OVERRIDE_DIR = ./header_overrides/
 
 # add new override source .c files as needed here
-OVERRIDE_SRCS  = $(HEADER_OVERRIDE_DIR)arm_fir_decimate_init_q31.c
+OVERRIDE_SRCS  = 
 
 OBJS_UNDER_TEST  = $(notdir $(SRC_FILES_TO_TEST:.c=.o)) \
 	$(notdir $(OVERRIDE_SRCS:.c=.o))

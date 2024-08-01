@@ -106,12 +106,12 @@ TEST(WavHeaderTest, num_channels_can_be_set)
 
 TEST(WavHeaderTest, sample_rate_can_be_set)
 {
-    Wave_Header_Attributes_t attr = {.sample_rate = WAVE_HEADER_SAMPLE_RATE_16kHz};
+    Wave_Header_Attributes_t attr = {.sample_rate = WAVE_HEADER_SAMPLE_RATE_24kHz};
 
     wav_header_set_attributes(&attr);
 
     uint32_t sample_rate = arr_slice_to_u32(wav_header, POS_START_OF_SAMPLE_RATE);
-    ASSERT_EQ(sample_rate, 16000);
+    ASSERT_EQ(sample_rate, 24000);
 
     attr.sample_rate = WAVE_HEADER_SAMPLE_RATE_48kHz;
     wav_header_set_attributes(&attr);
@@ -132,11 +132,11 @@ TEST(WavHeaderTest, bytes_per_sec_is_calculated_and_set)
     Wave_Header_Attributes_t attr = {
         .num_channels = WAVE_HEADER_STEREO,
         .bits_per_sample = WAVE_HEADER_16_BITS_PER_SAMPLE,
-        .sample_rate = WAVE_HEADER_SAMPLE_RATE_16kHz};
+        .sample_rate = WAVE_HEADER_SAMPLE_RATE_24kHz};
     wav_header_set_attributes(&attr);
 
     uint32_t bytes_per_sec = arr_slice_to_u32(wav_header, POS_START_OF_BYTES_PER_SEC);
-    ASSERT_EQ(bytes_per_sec, (2 * 16 * 16000) / 8);
+    ASSERT_EQ(bytes_per_sec, (2 * 16 * 24000) / 8);
 
     attr.num_channels = WAVE_HEADER_MONO;
     attr.bits_per_sample = WAVE_HEADER_24_BITS_PER_SAMPLE;

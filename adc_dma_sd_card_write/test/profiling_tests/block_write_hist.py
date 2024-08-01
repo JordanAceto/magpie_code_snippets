@@ -26,23 +26,25 @@ t_max = max(df.max(axis=1))
 t_min = min(df.min(axis=1))
 
 # make a plot with a histogram for each sample-rate/bit-depth combo, use a 7x2 layout like this
-#   16k 16bit, 16k 24bit
 #   24k 16bit, 24k 24bit
-# ... 32k through 192k sample rates follow the same pattern
+# ... 48k through 192k sample rates follow the same pattern
 # 384k 16 bit, 384k 24bit
 
-num_sample_rates = 7
-num_bit_depths = 2
+sample_rates = ["24k", "48k", "96k", "192k", "384k"]
+bit_depths = ["16 bit", "24 bit"]
+
+num_sample_rates = len(sample_rates)
+num_bit_depths = len(bit_depths)
 fig, axs = plt.subplots(num_sample_rates, num_bit_depths)
 
 fig.suptitle(
     f"Histogram of filter & SD card write time, {df.shape[0]} blocks each. {args.plot_details}"
 )
 
-for ax, col in zip(axs[0], ["16 bit", "24 bit"]):
+for ax, col in zip(axs[0], bit_depths):
     ax.set_title(col)
 
-for ax, row in zip(axs[:, 0], ["16k", "24k", "32k", "48k", "96k", "192k", "384k"]):
+for ax, row in zip(axs[:, 0], sample_rates):
     ax.set_ylabel(row, size="large")
 
 for i in range(num_sample_rates):

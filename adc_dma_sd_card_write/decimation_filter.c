@@ -1,211 +1,42 @@
 
 /* Private includes --------------------------------------------------------------------------------------------------*/
 
-#include "arm_fir_decimate_fast_q31_bob.h"
 #include "audio_dma.h"
 #include "data_converters.h"
 #include "decimation_filter.h"
 
-/* Private defines ---------------------------------------------------------------------------------------------------*/
-
-#define buffLen_deci2x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 2)
-#define buffLen_deci3x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 3)
-#define buffLen_deci4x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 4)
-#define buffLen_deci6x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 6)
-#define buffLen_deci8x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 8)
-#define buffLen_deci12x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 12)
-#define buffLen_deci16x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 16)
-#define buffLen_deci24x (AUDIO_DMA_BUFF_LEN_IN_SAMPS / 24)
-
-// 16 k
-#define deci_16k_numcoeffs_0 5
-#define deci_16k_numcoeffs_1 7
-#define deci_16k_numcoeffs_2 9
-#define deci_16k_numcoeffs_3 47
-#define deci_state_len_16k_0 (AUDIO_DMA_BUFF_LEN_IN_SAMPS + deci_16k_numcoeffs_0 - 1)
-#define deci_state_len_16k_1 (buffLen_deci2x + deci_16k_numcoeffs_1 - 1)
-#define deci_state_len_16k_2 (buffLen_deci4x + deci_16k_numcoeffs_2 - 1)
-#define deci_state_len_16k_3 (buffLen_deci8x + deci_16k_numcoeffs_3 - 1)
-
-// 24 k
-#define deci_24k_numcoeffs_0 5
-#define deci_24k_numcoeffs_1 7
-#define deci_24k_numcoeffs_2 9
-#define deci_24k_numcoeffs_3 33
-#define deci_state_len_24k_0 (AUDIO_DMA_BUFF_LEN_IN_SAMPS + deci_24k_numcoeffs_0 - 1)
-#define deci_state_len_24k_1 (buffLen_deci2x + deci_24k_numcoeffs_1 - 1)
-#define deci_state_len_24k_2 (buffLen_deci4x + deci_24k_numcoeffs_2 - 1)
-#define deci_state_len_24k_3 (buffLen_deci8x + deci_24k_numcoeffs_3 - 1)
-
-// 32 k
-#define deci_32k_numcoeffs_0 7
-#define deci_32k_numcoeffs_1 9
-#define deci_32k_numcoeffs_2 47
-#define deci_state_len_32k_0 (AUDIO_DMA_BUFF_LEN_IN_SAMPS + deci_32k_numcoeffs_0 - 1)
-#define deci_state_len_32k_1 (buffLen_deci2x + deci_32k_numcoeffs_1 - 1)
-#define deci_state_len_32k_2 (buffLen_deci4x + deci_32k_numcoeffs_2 - 1)
-
-// 48 k
-#define deci_48k_numcoeffs_0 7
-#define deci_48k_numcoeffs_1 9
-#define deci_48k_numcoeffs_2 33
-#define deci_state_len_48k_0 (AUDIO_DMA_BUFF_LEN_IN_SAMPS + deci_48k_numcoeffs_0 - 1)
-#define deci_state_len_48k_1 (buffLen_deci2x + deci_48k_numcoeffs_1 - 1)
-#define deci_state_len_48k_2 (buffLen_deci4x + deci_48k_numcoeffs_2 - 1)
-
-// 96 k
-#define deci_96k_numcoeffs_0 9
-#define deci_96k_numcoeffs_1 33
-#define deci_state_len_96k_0 (AUDIO_DMA_BUFF_LEN_IN_SAMPS + deci_96k_numcoeffs_0 - 1)
-#define deci_state_len_96k_1 (buffLen_deci2x + deci_96k_numcoeffs_1 - 1)
-
-// 192 k
-#define deci_192k_numcoeffs_0 15
-#define deci_state_len_192k_0 (AUDIO_DMA_BUFF_LEN_IN_SAMPS + deci_192k_numcoeffs_0 - 1)
-
 /* Private variables -------------------------------------------------------------------------------------------------*/
-
-// 16 k
-static q31_t firCoeffs_16k_0[deci_16k_numcoeffs_0] = {
-    86385383, 380767973, 588547483, 380767973, 86385383};
-static q31_t firCoeffs_16k_1[deci_16k_numcoeffs_1] = {
-    -63623254, 11777617, 601023485, 1051356664, 601023485, 11777617, -63623254};
-static q31_t firCoeffs_16k_2[deci_16k_numcoeffs_2] = {
-    -27728029, -77658950, 90916825, 613537738, 945568961, 613537738, 90916825, -77658950, -27728029};
-static q31_t firCoeffs_16k_3[deci_16k_numcoeffs_3] = {
-    544679, 5591621, 10519170, 11396576, 3740919, -9199321, -16459240, -8186184, 12423382, 27105429, 17140829, -15659956, -43184586, -32667249, 18552286, 68866053, 61256147, -20863109, -119392334, -129148756, 22338651, 303309288, 578589578, 692986716, 578589578, 303309288, 22338651, -129148756, -119392334, -20863109, 61256147, 68866053, 18552286, -32667249, -43184586, -15659956, 17140829, 27105429, 12423382, -8186184, -16459240, -9199321, 3740919, 11396576, 10519170, 5591621, 544679};
-
-// 24k
-static q31_t firCoeffs_24k_0[deci_24k_numcoeffs_0] = {
-    87026071, 382177371, 589816446, 382177371, 87026071};
-static q31_t firCoeffs_24k_1[deci_24k_numcoeffs_1] = {
-    -59682168, 25489114, 599055019, 1028294198, 599055019, 25489114, -59682168};
-static q31_t firCoeffs_24k_2[deci_24k_numcoeffs_2] = {
-    -35829136, -93392547, 90204797, 624894336, 955274946, 624894336, 90204797, -93392547, -35829136};
-static q31_t firCoeffs_24k_3[deci_24k_numcoeffs_3] = {
-    -2823963, 804105, 13756249, 13832557, -12099816, -21810016, 17681236, 39284877, -22118934, -66381589, 26258540, 112809109, -29540929, -212849373, 31655722, 678451831, 1041361918, 678451831, 31655722, -212849373, -29540929, 112809109, 26258540, -66381589, -22118934, 39284877, 17681236, -21810016, -12099816, 13832557, 13756249, 804105, -2823963};
-
-// 32 k
-static q31_t firCoeffs_32k_0[deci_32k_numcoeffs_0] = {
-    -44988434, 8328033, 424987782, 743421426, 424987782, 8328033, -44988434};
-static q31_t firCoeffs_32k_1[deci_32k_numcoeffs_1] = {
-    -27728029, -77658950, 90916825, 613537738, 945568961, 613537738, 90916825, -77658950, -27728029};
-static q31_t firCoeffs_32k_2[deci_32k_numcoeffs_2] = {
-    544679, 5591621, 10519170, 11396576, 3740919, -9199321, -16459240, -8186184, 12423382, 27105429, 17140829, -15659956, -43184586, -32667249, 18552286, 68866053, 61256147, -20863109, -119392334, -129148756, 22338651, 303309288, 578589578, 692986716, 578589578, 303309288, 22338651, -129148756, -119392334, -20863109, 61256147, 68866053, 18552286, -32667249, -43184586, -15659956, 17140829, 27105429, 12423382, -8186184, -16459240, -9199321, 3740919, 11396576, 10519170, 5591621, 544679};
-
-// 48 k
-static q31_t firCoeffs_48k_0[deci_48k_numcoeffs_0] = {
-    -42201666, 18023525, 423595866, 727113801, 423595866, 18023525, -42201666};
-static q31_t firCoeffs_48k_1[deci_48k_numcoeffs_1] = {
-    -35829136, -93392547, 90204797, 624894336, 955274946, 624894336, 90204797, -93392547, -35829136};
-static q31_t firCoeffs_48k_2[deci_48k_numcoeffs_2] = {
-    -2823963, 804105, 13756249, 13832557, -12099816, -21810016, 17681236, 39284877, -22118934, -66381589, 26258540, 112809109, -29540929, -212849373, 31655722, 678451831, 1041361918, 678451831, 31655722, -212849373, -29540929, 112809109, 26258540, -66381589, -22118934, 39284877, 17681236, -21810016, -12099816, 13832557, 13756249, 804105, -2823963};
-
-// 96 k
-static q31_t firCoeffs_96k_0[deci_96k_numcoeffs_0] = {
-    -20749647, -66609278, 51582801, 442242045, 691682165, 442242045, 51582801, -66609278, -20749647};
-static q31_t firCoeffs_96k_1[deci_96k_numcoeffs_1] = {
-    -3229201, 1658598, 16721610, 16330065, -12855261, -23661054, 18450717, 41258441, -22628821, -68277309, 26456118, 114386501, -29451143, -213892037, 31368109, 678814008, 1041713732, 678814008, 31368109, -213892037, -29451143, 114386501, 26456118, -68277309, -22628821, 41258441, 18450717, -23661054, -12855261, 16330065, 16721610, 1658598, -3229201};
-
-// 192k, 40dB version
-static q31_t firCoeffs_192k_0[deci_192k_numcoeffs_0] = {
-    -23215316, 15943290, 69341217, -4194368, -136036336, 11320770, 476387342, 749653914, 476387342, 11320770, -136036336, -4194368, 69341217, 15943290, -23215316};
-
-// decimated buffers for various stages of the multi-rate filters, reused in a ping-pong fashion to save SRAM
-static q31_t rx_ping_pong_buff_0[buffLen_deci2x] = {0}; // guaranteed to be big enough for the first round of any sample rate
-static q31_t rx_ping_pong_buff_1[buffLen_deci4x] = {0}; // guaranteed to be big enough for the second round of any sample rate
-
-// FIR states are reused across the filters to save SRMS, they must be zerod out and reinitialized when changing sample rates
-static q31_t fir_state_0[deci_state_len_192k_0] = {0}; // guaranteed to be big enough for the first round of any sample rate
-static q31_t fir_state_1[deci_state_len_96k_1] = {0};  // guaranteed to be big enough for the second round of any sample rate
-static q31_t fir_state_2[deci_state_len_32k_2] = {0};  // guaranteed to be big enough for the third round of any sample rate
-static q31_t fir_state_3[deci_state_len_16k_3] = {0};  // guaranteed to be big enough for the fourth round of any sample rate
-
-// 16 k
-static arm_fir_decimate_instance_q31 Sdeci_16k_0;
-static arm_fir_decimate_instance_q31 Sdeci_16k_1;
-static arm_fir_decimate_instance_q31 Sdeci_16k_2;
-static arm_fir_decimate_instance_q31 Sdeci_16k_3;
-
-// 24 k
-static arm_fir_decimate_instance_q31 Sdeci_24k_0;
-static arm_fir_decimate_instance_q31 Sdeci_24k_1;
-static arm_fir_decimate_instance_q31 Sdeci_24k_2;
-static arm_fir_decimate_instance_q31 Sdeci_24k_3;
-
-// 32 k
-static arm_fir_decimate_instance_q31 Sdeci_32k_0;
-static arm_fir_decimate_instance_q31 Sdeci_32k_1;
-static arm_fir_decimate_instance_q31 Sdeci_32k_2;
-
-// 48 k
-static arm_fir_decimate_instance_q31 Sdeci_48k_0;
-static arm_fir_decimate_instance_q31 Sdeci_48k_1;
-static arm_fir_decimate_instance_q31 Sdeci_48k_2;
-
-// 96 k
-static arm_fir_decimate_instance_q31 Sdeci_96k_0;
-static arm_fir_decimate_instance_q31 Sdeci_96k_1;
-
-// 192 k
-static arm_fir_decimate_instance_q31 Sdeci_192k_0;
 
 // the current sample rate to use when decimating
 static Wave_Header_Sample_Rate_t current_sample_rate = WAVE_HEADER_SAMPLE_RATE_384kHz;
+
+/* Private function declarations -------------------------------------------------------------------------------------*/
+
+static void decimate_16x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len); // note len is the final decimated output length
+
+void static decimate_8x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len);
+
+static void decimate_4x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len);
+
+static void decimate_2x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len);
 
 /* Public function definitions ---------------------------------------------------------------------------------------*/
 
 void decimation_filter_set_sample_rate(Wave_Header_Sample_Rate_t sample_rate)
 {
     current_sample_rate = sample_rate;
-
-    // reset the FIR state buffers
-    // memset(fir_state_0, 0, deci_state_len_192k_0);
-    // memset(fir_state_1, 0, deci_state_len_96k_1);
-    // memset(fir_state_2, 0, deci_state_len_32k_2);
-    // memset(fir_state_3, 0, deci_state_len_16k_3);
-
-    switch (sample_rate)
-    {
-    case WAVE_HEADER_SAMPLE_RATE_384kHz:
-        // don't need to do anything for the special case 384k, it does no filtering and should not be called here
-        break;
-
-    case WAVE_HEADER_SAMPLE_RATE_192kHz:
-        arm_fir_decimate_init_q31(&Sdeci_192k_0, deci_192k_numcoeffs_0, 2, firCoeffs_192k_0, fir_state_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        break;
-
-    case WAVE_HEADER_SAMPLE_RATE_96kHz:
-        arm_fir_decimate_init_q31(&Sdeci_96k_0, deci_96k_numcoeffs_0, 2, firCoeffs_96k_0, fir_state_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_init_q31(&Sdeci_96k_1, deci_96k_numcoeffs_1, 2, firCoeffs_96k_1, fir_state_1, buffLen_deci2x);
-        break;
-
-    case WAVE_HEADER_SAMPLE_RATE_48kHz:
-        arm_fir_decimate_init_q31(&Sdeci_48k_0, deci_48k_numcoeffs_0, 2, firCoeffs_48k_0, fir_state_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_init_q31(&Sdeci_48k_1, deci_48k_numcoeffs_1, 2, firCoeffs_48k_1, fir_state_1, buffLen_deci2x);
-        arm_fir_decimate_init_q31(&Sdeci_48k_2, deci_48k_numcoeffs_2, 2, firCoeffs_48k_2, fir_state_2, buffLen_deci4x);
-        break;
-
-    case WAVE_HEADER_SAMPLE_RATE_32kHz:
-        arm_fir_decimate_init_q31(&Sdeci_32k_0, deci_32k_numcoeffs_0, 3, firCoeffs_32k_0, fir_state_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_init_q31(&Sdeci_32k_1, deci_32k_numcoeffs_1, 2, firCoeffs_32k_1, fir_state_1, buffLen_deci3x);
-        arm_fir_decimate_init_q31(&Sdeci_32k_2, deci_32k_numcoeffs_2, 2, firCoeffs_32k_2, fir_state_2, buffLen_deci6x);
-        break;
-
-    case WAVE_HEADER_SAMPLE_RATE_24kHz:
-        arm_fir_decimate_init_q31(&Sdeci_24k_0, deci_24k_numcoeffs_0, 2, firCoeffs_24k_0, fir_state_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_init_q31(&Sdeci_24k_1, deci_24k_numcoeffs_1, 2, firCoeffs_24k_1, fir_state_1, buffLen_deci2x);
-        arm_fir_decimate_init_q31(&Sdeci_24k_2, deci_24k_numcoeffs_2, 2, firCoeffs_24k_2, fir_state_2, buffLen_deci4x);
-        arm_fir_decimate_init_q31(&Sdeci_24k_3, deci_24k_numcoeffs_3, 2, firCoeffs_24k_3, fir_state_3, buffLen_deci8x);
-        break;
-
-    case WAVE_HEADER_SAMPLE_RATE_16kHz:
-        arm_fir_decimate_init_q31(&Sdeci_16k_0, deci_16k_numcoeffs_0, 3, firCoeffs_16k_0, fir_state_0, AUDIO_DMA_BUFF_LEN_IN_SAMPS);
-        arm_fir_decimate_init_q31(&Sdeci_16k_1, deci_16k_numcoeffs_1, 2, firCoeffs_16k_1, fir_state_1, buffLen_deci3x);
-        arm_fir_decimate_init_q31(&Sdeci_16k_2, deci_16k_numcoeffs_2, 2, firCoeffs_16k_2, fir_state_2, buffLen_deci6x);
-        arm_fir_decimate_init_q31(&Sdeci_16k_3, deci_16k_numcoeffs_3, 2, firCoeffs_16k_3, fir_state_3, buffLen_deci12x);
-        break;
-    }
 }
 
 uint32_t decimation_filter_downsample(
@@ -213,54 +44,519 @@ uint32_t decimation_filter_downsample(
     q31_t *dest,
     uint32_t num_samps_to_filter)
 {
+    uint32_t dest_len_in_samps = 0;
+
     switch (current_sample_rate)
     {
-    case WAVE_HEADER_SAMPLE_RATE_384kHz:
-        // 384k is a special case which should not be called
-        return 0;
 
     case WAVE_HEADER_SAMPLE_RATE_192kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_192k_0, src_384kHz, dest, num_samps_to_filter);
-
-        return num_samps_to_filter / 2;
+        dest_len_in_samps = num_samps_to_filter / 2;
+        decimate_2x_iirHB(src_384kHz, dest, dest_len_in_samps);
+        break;
 
     case WAVE_HEADER_SAMPLE_RATE_96kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_0, src_384kHz, rx_ping_pong_buff_0, num_samps_to_filter);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_96k_1, rx_ping_pong_buff_0, dest, num_samps_to_filter / 2);
-
-        return num_samps_to_filter / 4;
+        dest_len_in_samps = num_samps_to_filter / 4;
+        decimate_4x_iirHB(src_384kHz, dest, dest_len_in_samps);
+        break;
 
     case WAVE_HEADER_SAMPLE_RATE_48kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_0, src_384kHz, rx_ping_pong_buff_0, num_samps_to_filter);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, num_samps_to_filter / 2);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_48k_2, rx_ping_pong_buff_1, dest, num_samps_to_filter / 4);
-
-        return num_samps_to_filter / 8;
-
-    case WAVE_HEADER_SAMPLE_RATE_32kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_0, src_384kHz, rx_ping_pong_buff_0, num_samps_to_filter);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, num_samps_to_filter / 3);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_32k_2, rx_ping_pong_buff_1, dest, num_samps_to_filter / 6);
-
-        return num_samps_to_filter / 12;
+        dest_len_in_samps = num_samps_to_filter / 8;
+        decimate_8x_iirHB(src_384kHz, dest, dest_len_in_samps);
+        break;
 
     case WAVE_HEADER_SAMPLE_RATE_24kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_0, src_384kHz, rx_ping_pong_buff_0, num_samps_to_filter);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, num_samps_to_filter / 2);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, num_samps_to_filter / 4);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_24k_3, rx_ping_pong_buff_0, dest, num_samps_to_filter / 8);
+        dest_len_in_samps = num_samps_to_filter / 16;
+        decimate_16x_iirHB(src_384kHz, dest, dest_len_in_samps);
+        break;
 
-        return num_samps_to_filter / 16;
-
-    case WAVE_HEADER_SAMPLE_RATE_16kHz:
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_0, src_384kHz, rx_ping_pong_buff_0, num_samps_to_filter);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_1, rx_ping_pong_buff_0, rx_ping_pong_buff_1, num_samps_to_filter / 3);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_2, rx_ping_pong_buff_1, rx_ping_pong_buff_0, num_samps_to_filter / 6);
-        arm_fir_decimate_fast_q31_bob(&Sdeci_16k_3, rx_ping_pong_buff_0, dest, num_samps_to_filter / 12);
-
-        return num_samps_to_filter / 24;
+    case WAVE_HEADER_SAMPLE_RATE_384kHz:
+    default:
+        // 384k is a special case which should not be called
+        break;
     }
 
     // never reached if all preconditions are met
-    return 0;
+    return dest_len_in_samps;
+}
+
+/* Private function definitions --------------------------------------------------------------------------------------*/
+
+void decimate_16x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len) // note len is the final decimated output length, = input length/8
+{
+    uint32_t k;
+    static q31_t state_stg0_zm1 = 0; // 1st decimation stg
+    static q31_t state_stg0_zm0 = 0;
+
+    static q31_t state_stg1_zm1 = 0; // 2nd decimation stg
+    static q31_t state_stg1_zm0 = 0;
+
+    // the non-delayed Allpass state-var paths are designated with _A_
+    // the delayed Allpass state-var paths are designated with _B_
+
+    static q31_t state_stg2_A_zm1 = 0;
+    static q31_t state_stg2_A_zm0 = 0;
+    static q31_t state_stg2_B_zm1 = 0;
+    static q31_t state_stg2_B_zm0 = 0;
+
+    static q31_t state_stg3_A_zm2 = 0;
+    static q31_t state_stg3_A_zm1 = 0;
+    static q31_t state_stg3_A_zm0 = 0;
+    static q31_t state_stg3_B_zm1 = 0;
+    static q31_t state_stg3_B_zm0 = 0;
+
+    // outputs
+    static q31_t deci_stg0_out0 = 0;
+    static q31_t deci_stg0_out1 = 0;
+    static q31_t deci_stg0_out2 = 0;
+    static q31_t deci_stg0_out3 = 0;
+    static q31_t deci_stg0_out4 = 0;
+    static q31_t deci_stg0_out5 = 0;
+    static q31_t deci_stg0_out6 = 0;
+    static q31_t deci_stg0_out7 = 0;
+
+    static q31_t deci_stg1_out0 = 0;
+    static q31_t deci_stg1_out1 = 0;
+    static q31_t deci_stg1_out2 = 0;
+    static q31_t deci_stg1_out3 = 0;
+
+    static q31_t deci_stg2_out0 = 0;
+    static q31_t deci_stg2_out1 = 0;
+
+    static q31_t coeff_d2_n0_A_stg3 = 0x0D9C6C2D;
+    static q31_t coeff_d1_n1_A_stg3 = 0x77233802;
+    static q31_t coeff_d1_n1_B_stg3 = 0x385BACD3;
+    static q31_t mult_temp1;
+    static q31_t mult_temp2;
+    static q31_t allpass_A, allpass_B;
+
+    static q31_t in0, in1, in2, in3, in4, in5, in6, in7;
+    static q31_t in8, in9, in10, in11, in12, in13, in14, in15;
+
+    static q31_t deci_out;
+
+    k = len;
+
+    while (k > 0)
+    { // each loop produces 2 outputs at 2X rate, so use DMALEN/8
+
+        // input is divided by 16, then gain by 2*2*2, then gain by (1 + 1/2), 1/2*3/2 = 3/4 = -2.49 dB
+        in0 = (*pSrc++ >> 5);
+        in1 = (*pSrc++ >> 5);
+        in2 = (*pSrc++ >> 5);
+        in3 = (*pSrc++ >> 5);
+        in4 = (*pSrc++ >> 5);
+        in5 = (*pSrc++ >> 5);
+        in6 = (*pSrc++ >> 5);
+        in7 = (*pSrc++ >> 5);
+        in8 = (*pSrc++ >> 5);
+        in9 = (*pSrc++ >> 5);
+        in10 = (*pSrc++ >> 5);
+        in11 = (*pSrc++ >> 5);
+        in12 = (*pSrc++ >> 5);
+        in13 = (*pSrc++ >> 5);
+        in14 = (*pSrc++ >> 5);
+        in15 = (*pSrc++ >> 5);
+
+        // ***** 1st filter ****
+        // 1st stage comes from 3rd order elliptc prototype, 1st-order in non-delayed branch
+        // ***** 1st 2:1 decimator, gain = 2 ***
+
+        // 1st shift the zm1 to zm0 based on the current zm1 value
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in1 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out0 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in0;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in3 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out1 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in2;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in5 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out2 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in4;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in7 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out3 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in6;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in9 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out4 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in8;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in11 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out5 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in10;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in13 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out6 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in12;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in15 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out7 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in14;
+
+        //***** 2nd filter, 8 in, 4 out, same structires as 1st filter
+
+        // ***** 2nd 2:1 decimator, same structure as 1st filter ***
+        state_stg1_zm1 = state_stg1_zm0;
+        state_stg1_zm0 = deci_stg0_out1 - (state_stg1_zm1 >> 2) - (state_stg1_zm1 >> 4) - (state_stg1_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg1_out0 = state_stg1_zm1 + (state_stg1_zm0 >> 2) + (state_stg1_zm0 >> 4) + (state_stg1_zm0 >> 5) + deci_stg0_out0;
+
+        state_stg1_zm1 = state_stg1_zm0;
+        state_stg1_zm0 = deci_stg0_out3 - (state_stg1_zm1 >> 2) - (state_stg1_zm1 >> 4) - (state_stg1_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg1_out1 = state_stg1_zm1 + (state_stg1_zm0 >> 2) + (state_stg1_zm0 >> 4) + (state_stg1_zm0 >> 5) + deci_stg0_out2;
+
+        state_stg1_zm1 = state_stg1_zm0;
+        state_stg1_zm0 = deci_stg0_out5 - (state_stg1_zm1 >> 2) - (state_stg1_zm1 >> 4) - (state_stg1_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg1_out2 = state_stg1_zm1 + (state_stg1_zm0 >> 2) + (state_stg1_zm0 >> 4) + (state_stg1_zm0 >> 5) + deci_stg0_out4;
+
+        state_stg1_zm1 = state_stg1_zm0;
+        state_stg1_zm0 = deci_stg0_out7 - (state_stg1_zm1 >> 2) - (state_stg1_zm1 >> 4) - (state_stg1_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg1_out3 = state_stg1_zm1 + (state_stg1_zm0 >> 2) + (state_stg1_zm0 >> 4) + (state_stg1_zm0 >> 5) + deci_stg0_out6;
+
+        // ***** 3rd filter ***
+        // 1st order allpass stg 1, 4 in, 2 out
+        // 1st one is non-delayed
+        // gain = 2
+        state_stg2_A_zm1 = state_stg2_A_zm0;
+        state_stg2_A_zm0 = deci_stg1_out1 - (state_stg2_A_zm1 >> 3);
+        allpass_A = state_stg2_A_zm1 + (state_stg2_A_zm0 >> 3);
+        // 1st order allpass for the delayed branch
+        state_stg2_B_zm1 = state_stg2_B_zm0;
+        state_stg2_B_zm0 = deci_stg1_out0 - (state_stg2_B_zm1 >> 1) - (state_stg2_B_zm1 >> 4);
+        allpass_B = state_stg2_B_zm1 + (state_stg2_B_zm0 >> 1) + (state_stg2_B_zm0 >> 4);
+        deci_stg2_out0 = allpass_B + allpass_A;
+
+        state_stg2_A_zm1 = state_stg2_A_zm0;
+        state_stg2_A_zm0 = deci_stg1_out3 - (state_stg2_A_zm1 >> 3);
+        allpass_A = state_stg2_A_zm1 + (state_stg2_A_zm0 >> 3);
+        // 1st order allpass for the delayed branch
+        state_stg2_B_zm1 = state_stg2_B_zm0;
+        state_stg2_B_zm0 = deci_stg1_out2 - (state_stg2_B_zm1 >> 1) - (state_stg2_B_zm1 >> 4);
+        allpass_B = state_stg2_B_zm1 + (state_stg2_B_zm0 >> 1) + (state_stg2_B_zm0 >> 4);
+        deci_stg2_out1 = allpass_B + allpass_A;
+
+        // at this point I've processed 8 inputs from the dma array and produced 2 outputs
+        // now for the final stg, which has a 2nd-order allpass in the
+        // un-delayed branch and a 1st-order allpass in the delayed branch (7th order elliptic)
+
+        // ***** 4th 2:1 decimator, 2 in, 1 out ***
+        // gain 2
+        // 2nd order allpass
+        state_stg3_A_zm2 = state_stg3_A_zm1; // non-delayed branch
+        state_stg3_A_zm1 = state_stg3_A_zm0;
+        // faster to shift mult result right by 32 and then left by 1
+        mult_temp1 = ((q31_t)(((q63_t)state_stg3_A_zm1 * coeff_d1_n1_A_stg3) >> 32)) << 1;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg3_A_zm2 * coeff_d2_n0_A_stg3) >> 32)) << 1;
+        state_stg3_A_zm0 = deci_stg2_out1 - mult_temp1 - mult_temp2;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg3_A_zm0 * coeff_d2_n0_A_stg3) >> 32)) << 1;
+        allpass_A = mult_temp1 + mult_temp2 + state_stg3_A_zm2;
+
+        // 1st order allpass for the delayed branch
+        state_stg3_B_zm1 = state_stg3_B_zm0;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg3_B_zm1 * coeff_d1_n1_B_stg3) >> 32)) << 1;
+        state_stg3_B_zm0 = deci_stg2_out0 - mult_temp1;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg3_B_zm0 * coeff_d1_n1_B_stg3) >> 32)) << 1;
+        allpass_B = mult_temp1 + state_stg3_B_zm1;
+
+        deci_out = allpass_B + allpass_A;     // this has a gain of 1/4 from the input
+        *pDst++ = (deci_out >> 1) + deci_out; // 20*log10((1/4)*(2 + 1)) = -2.49 dB
+
+        k--;
+    }
+}
+
+void decimate_8x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len) // note len is the final decimated output length, = input length/8
+{
+    uint32_t k;
+    static q31_t state_stg0_zm1 = 0; // 1st number os decimation stg
+    static q31_t state_stg0_zm0 = 0;
+
+    // the non-delayed Allpass state-var paths are designated with _A_
+    // the delayed Allpass state-var paths are designated with _B_
+
+    static q31_t state_stg1_A_zm1 = 0;
+    static q31_t state_stg1_A_zm0 = 0;
+    static q31_t state_stg1_B_zm1 = 0;
+    static q31_t state_stg1_B_zm0 = 0;
+
+    static q31_t state_stg2_A_zm2 = 0;
+    static q31_t state_stg2_A_zm1 = 0;
+    static q31_t state_stg2_A_zm0 = 0;
+    static q31_t state_stg2_B_zm1 = 0;
+    static q31_t state_stg2_B_zm0 = 0;
+
+    static q31_t deci_stg0_out0 = 0;
+    static q31_t deci_stg0_out1 = 0;
+    static q31_t deci_stg0_out2 = 0;
+    static q31_t deci_stg0_out3 = 0;
+
+    static q31_t deci_stg1_out0 = 0;
+    static q31_t deci_stg1_out1 = 0;
+
+    static q31_t coeff_d2_n0_A_stg2 = 0x0D9C6C2D;
+    static q31_t coeff_d1_n1_A_stg2 = 0x77233802;
+    static q31_t coeff_d1_n1_B_stg2 = 0x385BACD3;
+    static q31_t mult_temp1;
+    static q31_t mult_temp2;
+    static q31_t allpass_A, allpass_B;
+
+    static q31_t in0, in1, in2, in3, in4, in5, in6, in7;
+    static q31_t deci_out;
+
+    k = len;
+
+    while (k > 0)
+    { // each loop produces 2 outputs at 2X rate, so use DMALEN/8
+
+        // input is divided by 16, then gain by 2*2*2, then gain by (1 + 1/2), 1/2*3/2 = 3/4 = -2.49 dB
+        in0 = (*pSrc++ >> 4);
+        in1 = (*pSrc++ >> 4);
+        in2 = (*pSrc++ >> 4);
+        in3 = (*pSrc++ >> 4);
+        in4 = (*pSrc++ >> 4);
+        in5 = (*pSrc++ >> 4);
+        in6 = (*pSrc++ >> 4);
+        in7 = (*pSrc++ >> 4);
+
+        // 1st stage comes from 3rd order elliptc prototype, 1st-order in non-delayed branch
+        // ***** 1st 2:1 decimator, gain = 2 ***
+
+        // 1st shift the zm1 to zm0 based on the current zm1 value
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in1 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out0 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in0;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in3 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out1 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in2;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in5 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out2 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in4;
+
+        state_stg0_zm1 = state_stg0_zm0;
+        state_stg0_zm0 = in7 - (state_stg0_zm1 >> 2) - (state_stg0_zm1 >> 4) - (state_stg0_zm1 >> 5); // scale input by 1/2 so the output does not need to be scaled by 1/2
+        deci_stg0_out3 = state_stg0_zm1 + (state_stg0_zm0 >> 2) + (state_stg0_zm0 >> 4) + (state_stg0_zm0 >> 5) + in6;
+
+        // at this point I've processed 8 inputs from the dma array and produced 4 outputs
+        // now take 4 outputs and use the same filter as above to produce 2 outputs
+        // this stage has a 1st-order allpass in both delayed and non-delayed branches (from 5th-order elliptic prototype)
+
+        // ***** 2nd 2:1 decimator ***
+
+        // instance 1
+        // 1st order allpass stg 1, 2 instances to produce 2 outputs
+        // 1st one is non-delayed
+        // gain = 2
+        state_stg1_A_zm1 = state_stg1_A_zm0;
+        state_stg1_A_zm0 = deci_stg0_out1 - (state_stg1_A_zm1 >> 3);
+        allpass_A = state_stg1_A_zm1 + (state_stg1_A_zm0 >> 3);
+        // 1st order allpass for the delayed branch
+        state_stg1_B_zm1 = state_stg1_B_zm0;
+        state_stg1_B_zm0 = deci_stg0_out0 - (state_stg1_B_zm1 >> 1) - (state_stg1_B_zm1 >> 4);
+        allpass_B = state_stg1_B_zm1 + (state_stg1_B_zm0 >> 1) + (state_stg1_B_zm0 >> 4);
+        deci_stg1_out0 = allpass_B + allpass_A;
+
+        // instance 2
+        state_stg1_A_zm1 = state_stg1_A_zm0;
+        state_stg1_A_zm0 = deci_stg0_out3 - (state_stg1_A_zm1 >> 3);
+        allpass_A = state_stg1_A_zm1 + (state_stg1_A_zm0 >> 3);
+        // 1st order allpass for the delayed branch
+        state_stg1_B_zm1 = state_stg1_B_zm0;
+        state_stg1_B_zm0 = deci_stg0_out2 - (state_stg1_B_zm1 >> 1) - (state_stg1_B_zm1 >> 4);
+        allpass_B = state_stg1_B_zm1 + (state_stg1_B_zm0 >> 1) + (state_stg1_B_zm0 >> 4);
+        deci_stg1_out1 = allpass_B + allpass_A;
+
+        // at this point I've processed 8 inputs from the dma array and produced 2 outputs
+        // now for the final stg, which has a 2nd-order allpass in the
+        // un-delayed branch and a 1st-order allpass in the delayed branch (7th order elliptic)
+
+        // ***** 3rd 2:1 decimator ***
+        // gain 2
+        // 2nd order allpass
+        state_stg2_A_zm2 = state_stg2_A_zm1; // non-delayed branch
+        state_stg2_A_zm1 = state_stg2_A_zm0;
+        // faster to shift mult result right by 32 and then left by 1
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_A_zm1 * coeff_d1_n1_A_stg2) >> 32)) << 1;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg2_A_zm2 * coeff_d2_n0_A_stg2) >> 32)) << 1;
+        state_stg2_A_zm0 = deci_stg1_out1 - mult_temp1 - mult_temp2;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg2_A_zm0 * coeff_d2_n0_A_stg2) >> 32)) << 1;
+        allpass_A = mult_temp1 + mult_temp2 + state_stg2_A_zm2;
+
+        // 1st order allpass for the delayed branch
+        state_stg2_B_zm1 = state_stg2_B_zm0;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_B_zm1 * coeff_d1_n1_B_stg2) >> 32)) << 1;
+        state_stg2_B_zm0 = deci_stg1_out0 - mult_temp1;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_B_zm0 * coeff_d1_n1_B_stg2) >> 32)) << 1;
+        allpass_B = mult_temp1 + state_stg2_B_zm1;
+
+        deci_out = allpass_B + allpass_A;     // this has a gain of 1/4 from the input
+        *pDst++ = (deci_out >> 1) + deci_out; // 20*log10((1/4)*(2 + 1)) = -2.49 dB
+
+        k--;
+    }
+}
+
+void decimate_4x_iirHB( // takes 1.6ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len) // note len is the final decimated output length, = input length/8
+{
+    uint32_t k;
+
+    // the non-delayed Allpass state-var paths are designated with _A_
+    // the delayed Allpass state-var paths are designated with _B_
+
+    static q31_t state_stg1_A_zm1 = 0;
+    static q31_t state_stg1_A_zm0 = 0;
+    static q31_t state_stg1_B_zm1 = 0;
+    static q31_t state_stg1_B_zm0 = 0;
+
+    static q31_t state_stg2_A_zm2 = 0;
+    static q31_t state_stg2_A_zm1 = 0;
+    static q31_t state_stg2_A_zm0 = 0;
+    static q31_t state_stg2_B_zm1 = 0;
+    static q31_t state_stg2_B_zm0 = 0;
+
+    static q31_t deci_stg1_out0 = 0;
+    static q31_t deci_stg1_out1 = 0;
+    static q31_t coeff_d2_n0_A_stg2 = 0x0D9C6C2D;
+    static q31_t coeff_d1_n1_A_stg2 = 0x77233802;
+    static q31_t coeff_d1_n1_B_stg2 = 0x385BACD3;
+
+    static q31_t mult_temp1;
+    static q31_t mult_temp2;
+    static q31_t allpass_A, allpass_B;
+
+    static q31_t in0, in1, in2, in3;
+    static q31_t deci_out;
+
+    k = len;
+
+    while (k > 0)
+    { // each loop produces 2 outputs at 2X rate, so use DMALEN/8
+
+        // input/8 *2*2*(3/2)
+        in0 = (*pSrc++ >> 3);
+        in1 = (*pSrc++ >> 3);
+        in2 = (*pSrc++ >> 3);
+        in3 = (*pSrc++ >> 3);
+
+        // ***** 1st 2:1 decimator ***
+
+        // instance 1
+        // 1st order allpass stg 1, 2 instances to produce 2 outputs
+        // 1st one is non-delayed
+        // gain 2
+        state_stg1_A_zm1 = state_stg1_A_zm0;
+        state_stg1_A_zm0 = in1 - (state_stg1_A_zm1 >> 3);
+        allpass_A = state_stg1_A_zm1 + (state_stg1_A_zm0 >> 3);
+        // 1st order allpass for the delayed branch
+        state_stg1_B_zm1 = state_stg1_B_zm0;
+        state_stg1_B_zm0 = in0 - (state_stg1_B_zm1 >> 1) - (state_stg1_B_zm1 >> 4);
+        allpass_B = state_stg1_B_zm1 + (state_stg1_B_zm0 >> 1) + (state_stg1_B_zm0 >> 4);
+        deci_stg1_out0 = allpass_B + allpass_A;
+
+        // instance 2
+        state_stg1_A_zm1 = state_stg1_A_zm0;
+        state_stg1_A_zm0 = in3 - (state_stg1_A_zm1 >> 3);
+        allpass_A = state_stg1_A_zm1 + (state_stg1_A_zm0 >> 3);
+        // 1st order allpass for the delayed branch
+        state_stg1_B_zm1 = state_stg1_B_zm0;
+        state_stg1_B_zm0 = in2 - (state_stg1_B_zm1 >> 1) - (state_stg1_B_zm1 >> 4);
+        allpass_B = state_stg1_B_zm1 + (state_stg1_B_zm0 >> 1) + (state_stg1_B_zm0 >> 4);
+        deci_stg1_out1 = allpass_B + allpass_A;
+
+        // at this point I've processed 4 inputs from the dma array and produced 2 outputs
+        // now for the final stg, which has a 2nd-order allpass in the
+        // un-delayed branch and a 1st-order allpass in the delayed branch (7th order elliptic)
+
+        // ***** 3rd 2:1 decimator, gain 2 ***
+
+        // 2nd order allpass
+        state_stg2_A_zm2 = state_stg2_A_zm1; // non-delayed branch
+        state_stg2_A_zm1 = state_stg2_A_zm0;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_A_zm1 * coeff_d1_n1_A_stg2) >> 32)) << 1;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg2_A_zm2 * coeff_d2_n0_A_stg2) >> 32)) << 1;
+        state_stg2_A_zm0 = deci_stg1_out1 - mult_temp1 - mult_temp2;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg2_A_zm0 * coeff_d2_n0_A_stg2) >> 32)) << 1;
+        allpass_A = mult_temp1 + mult_temp2 + state_stg2_A_zm2;
+
+        // 1st order allpass for the delayed branch
+        state_stg2_B_zm1 = state_stg2_B_zm0;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_B_zm1 * coeff_d1_n1_B_stg2) >> 32)) << 1;
+        state_stg2_B_zm0 = deci_stg1_out0 - mult_temp1;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_B_zm0 * coeff_d1_n1_B_stg2) >> 32)) << 1;
+        allpass_B = mult_temp1 + state_stg2_B_zm1;
+
+        deci_out = allpass_B + allpass_A;     // this has a gain of 1/2 from the input
+        *pDst++ = (deci_out >> 1) + deci_out; //  -2.49 dB
+
+        k--;
+    }
+}
+
+void decimate_2x_iirHB( // takes 3.2ms, new design (7/28/24) with 50dB
+    q31_t *pSrc,
+    q31_t *pDst,
+    uint32_t len) // note len is the final decimated output length, = input length/8
+{
+    uint32_t k;
+
+    // the non-delayed Allpass state-var paths are designated with _A_
+    // the delayed Allpass state-var paths are designated with _B_
+
+    static q31_t state_stg2_A_zm2 = 0;
+    static q31_t state_stg2_A_zm1 = 0;
+    static q31_t state_stg2_A_zm0 = 0;
+    static q31_t state_stg2_B_zm1 = 0;
+    static q31_t state_stg2_B_zm0 = 0;
+
+    static q31_t coeff_d2_n0_A_stg2 = 0x0D9C6C2D;
+    static q31_t coeff_d1_n1_A_stg2 = 0x77233802;
+    static q31_t coeff_d1_n1_B_stg2 = 0x385BACD3;
+
+    static q31_t mult_temp1;
+    static q31_t mult_temp2;
+    static q31_t allpass_A, allpass_B;
+
+    static q31_t in0, in1;
+    static q31_t deci_out;
+
+    k = len;
+
+    while (k > 0)
+    { // each loop produces 2 outputs at 2X rate, so use DMALEN/8
+
+        // input /4 *2*(3/2)
+        in0 = (*pSrc++ >> 2);
+        in1 = (*pSrc++ >> 2);
+
+        // 2nd order allpass
+        state_stg2_A_zm2 = state_stg2_A_zm1; // non-delayed branch
+        state_stg2_A_zm1 = state_stg2_A_zm0;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_A_zm1 * coeff_d1_n1_A_stg2) >> 32)) << 1;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg2_A_zm2 * coeff_d2_n0_A_stg2) >> 32)) << 1;
+        state_stg2_A_zm0 = in1 - mult_temp1 - mult_temp2;
+        mult_temp2 = ((q31_t)(((q63_t)state_stg2_A_zm0 * coeff_d2_n0_A_stg2) >> 32)) << 1;
+        allpass_A = mult_temp1 + mult_temp2 + state_stg2_A_zm2;
+
+        // 1st order allpass for the delayed branch
+        state_stg2_B_zm1 = state_stg2_B_zm0;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_B_zm1 * coeff_d1_n1_B_stg2) >> 32)) << 1;
+        state_stg2_B_zm0 = in0 - mult_temp1;
+        mult_temp1 = ((q31_t)(((q63_t)state_stg2_B_zm0 * coeff_d1_n1_B_stg2) >> 32)) << 1;
+        allpass_B = mult_temp1 + state_stg2_B_zm1;
+
+        deci_out = allpass_B + allpass_A;     // this has a gain of 1/2
+        *pDst++ = (deci_out >> 1) + deci_out; // -2.49 dB
+
+        k--;
+    }
 }

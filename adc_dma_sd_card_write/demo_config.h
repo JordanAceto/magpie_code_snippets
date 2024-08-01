@@ -21,9 +21,7 @@
 
 // comment or uncomment sample rates to add them to the test
 const Wave_Header_Sample_Rate_t demo_sample_rates_to_test[] = {
-    WAVE_HEADER_SAMPLE_RATE_16kHz,
     WAVE_HEADER_SAMPLE_RATE_24kHz,
-    WAVE_HEADER_SAMPLE_RATE_32kHz,
     WAVE_HEADER_SAMPLE_RATE_48kHz,
     WAVE_HEADER_SAMPLE_RATE_96kHz,
     WAVE_HEADER_SAMPLE_RATE_192kHz,

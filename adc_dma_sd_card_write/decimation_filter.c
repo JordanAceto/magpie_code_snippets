@@ -17,7 +17,7 @@ static void decimate_16x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
     q31_t *pDst,
     uint32_t len); // note len is the final decimated output length
 
-void static decimate_8x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
+static void decimate_8x_iirHB( // takes 1.7ms, new design (7/28/24) with 50dB
     q31_t *pSrc,
     q31_t *pDst,
     uint32_t len);

@@ -17,7 +17,7 @@
 
 /* Public definitions ------------------------------------------------------------------------------------------------*/
 
-// 24-bit words (not bytes), note this is divisible by 2, 4, 8, 12, 16, and 24 to support all desired sample-rates
+// 24-bit words (not bytes), note this is divisible by 2, 4, 8, and 16 to support all desired sample-rates
 #define AUDIO_DMA_BUFF_LEN_IN_SAMPS (8256)
 
 // the largest size in bytes that can be stored in a single round of DMA processing

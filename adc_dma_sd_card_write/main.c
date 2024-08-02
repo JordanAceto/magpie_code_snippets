@@ -31,11 +31,6 @@ typedef enum
     LED_COLOR_BLUE,
 } LED_Color_t;
 
-/* Private variables -------------------------------------------------------------------------------------------------*/
-
-// a buffer for downsampled audio
-static uint8_t downsampled_audio[AUDIO_DMA_LARGEST_BUFF_LEN_IN_BYTES];
-
 /* Private function declarations -------------------------------------------------------------------------------------*/
 
 /**
@@ -126,6 +121,10 @@ int main(void)
 
 void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_secs)
 {
+    // a buffers for processing the audio data, big enough to fit one full buffers worth of samples as q31s
+    static uint8_t audio_buff_0[AUDIO_DMA_BUFF_LEN_IN_SAMPS * 4];
+    static uint8_t audio_buff_1[AUDIO_DMA_BUFF_LEN_IN_SAMPS * 4];
+
     // a variable to store the number of bytes written to the SD card, can be checked against the intended amount
     static uint32_t bytes_written;
 
@@ -158,10 +157,6 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
         error_handler(LED_COLOR_RED);
     }
 
-    // 384kHz is a special case where we take 24 bit samples from the DMA, for all other sample rates we want 32 bit samples
-    const Audio_DMA_Sample_Width_t sample_width = wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz ? AUDIO_DMA_SAMPLE_WIDTH_24_BITS : AUDIO_DMA_SAMPLE_WIDTH_32_BITS;
-    audio_dma_set_sample_width(sample_width);
-
     decimation_filter_set_sample_rate(wav_attr->sample_rate);
 
     ad4630_cont_conversions_start();
@@ -179,21 +174,23 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
 #if DEMO_CONFIG_GENERATE_CSV_OF_WRITE_TIMES == 1
             MXC_TMR_SW_Start(MXC_TMR1); // for profiling the time it takes to filter and write out the buffer
 #endif
-
             if (wav_attr->sample_rate == WAVE_HEADER_SAMPLE_RATE_384kHz)
             {
+                // for 384kHz data, we just need to swap the endianness of the sample to little-endian format needed for WAV
+                data_converters_i24_swap_endianness(audio_dma_consume_buffer(), audio_buff_0, AUDIO_DMA_BUFF_LEN_IN_BYTES);
+
                 if (wav_attr->bits_per_sample == WAVE_HEADER_24_BITS_PER_SAMPLE)
                 {
-                    if (sd_card_fwrite(audio_dma_consume_buffer(), audio_dma_buffer_size_in_bytes(), &bytes_written) != SD_CARD_ERROR_ALL_OK)
+                    if (sd_card_fwrite(audio_buff_0, AUDIO_DMA_BUFF_LEN_IN_BYTES, &bytes_written) != SD_CARD_ERROR_ALL_OK)
                     {
                         error_handler(LED_COLOR_RED);
                     }
                 }
                 else // it must be 16 bits
                 {
-                    const uint32_t len_in_bytes = data_converters_i24_to_q15(audio_dma_consume_buffer(), (q15_t *)downsampled_audio, audio_dma_buffer_size_in_bytes());
+                    const uint32_t len = data_converters_i24_to_q15(audio_buff_0, (q15_t *)audio_buff_0, AUDIO_DMA_BUFF_LEN_IN_BYTES);
 
-                    if (sd_card_fwrite(downsampled_audio, len_in_bytes, &bytes_written) != SD_CARD_ERROR_ALL_OK)
+                    if (sd_card_fwrite(audio_buff_0, len, &bytes_written) != SD_CARD_ERROR_ALL_OK)
                     {
                         error_handler(LED_COLOR_RED);
                     }
@@ -201,23 +198,26 @@ void write_demo_wav_file(Wave_Header_Attributes_t *wav_attr, uint32_t file_len_s
             }
             else // it's not the special case of 384kHz, all other sample rates are filtered
             {
+                // all sample rates other than 384k are filtered, so we need to swap endianness and also expand to 32 bit words as expected by the filters
+                data_converters_i24_to_q31_with_endian_swap(audio_dma_consume_buffer(), (q31_t *)audio_buff_0, AUDIO_DMA_BUFF_LEN_IN_BYTES);
+
                 const uint32_t len_in_samps = decimation_filter_downsample(
-                    (q31_t *)audio_dma_consume_buffer(),
-                    (q31_t *)downsampled_audio,
-                    audio_dma_buffer_size_in_bytes() / 4); // we want num samples, not num bytes
+                    (q31_t *)audio_buff_0,
+                    (q31_t *)audio_buff_1,
+                    AUDIO_DMA_BUFF_LEN_IN_SAMPS); // we want num samples, not num bytes
 
+                // note that the data conversion functions for truncating down to 16 and 24 bits can work in-place
                 uint32_t len_in_bytes;
-
                 if (wav_attr->bits_per_sample == WAVE_HEADER_24_BITS_PER_SAMPLE)
                 {
-                    len_in_bytes = data_converters_q31_to_i24((q31_t *)downsampled_audio, downsampled_audio, len_in_samps);
+                    len_in_bytes = data_converters_q31_to_i24((q31_t *)audio_buff_1, audio_buff_1, len_in_samps);
                 }
                 else // it's 16 bits
                 {
-                    len_in_bytes = data_converters_q31_to_q15((q31_t *)downsampled_audio, (q15_t *)downsampled_audio, len_in_samps);
+                    len_in_bytes = data_converters_q31_to_q15((q31_t *)audio_buff_1, (q15_t *)audio_buff_1, len_in_samps);
                 }
 
-                if (sd_card_fwrite(downsampled_audio, len_in_bytes, &bytes_written) != SD_CARD_ERROR_ALL_OK)
+                if (sd_card_fwrite(audio_buff_1, len_in_bytes, &bytes_written) != SD_CARD_ERROR_ALL_OK)
                 {
                     error_handler(LED_COLOR_RED);
                 }

@@ -2,7 +2,6 @@
 
 #include "arm_math.h"
 #include "audio_dma.h"
-#include "data_converters.h"
 #include "dma.h"
 #include "dma_regs.h"
 #include "gpio_helpers.h"
@@ -14,15 +13,14 @@
 
 /* Private defines ---------------------------------------------------------------------------------------------------*/
 
-// data can be represented as either 3-byte or 4-byte samples
-#define AUDIO_DMA_BUFF_LEN_IN_I24_BYTES (AUDIO_DMA_BUFF_LEN_IN_SAMPS * DATA_CONVERTERS_I24_SIZE_IN_BYTES)
-#define AUDIO_DMA_BUFF_LEN_IN_Q31_BYTES (AUDIO_DMA_BUFF_LEN_IN_SAMPS * DATA_CONVERTERS_Q31_SIZE_IN_BYTES)
-
 // the number of stalls we can tolerate when the SD card takes longer to write than usual, MUST be a power of 2
 #define DMA_NUM_STALLS_ALLOWED (4)
 
 // the length of the big DMA buffer with spare room for tolerating SD card write stalls
-#define AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_LARGEST_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED)
+#define AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES (AUDIO_DMA_BUFF_LEN_IN_BYTES * DMA_NUM_STALLS_ALLOWED)
+
+// least common multiple for 3-byte samples crammed into 4-byte words
+#define I24_AND_I32_LCM (3 * 4)
 
 // halt compilation if the buffer lengths do not conform to the necessary multiplicity, this is so an even number of
 // samples can fit in the buffers for all sample rates
@@ -36,7 +34,7 @@
 #endif
 
 // the threshold for triggering a DMA request
-#define DMA_SPI_RX_THRESHOLD (DATA_CONVERTERS_I24_SIZE_IN_BYTES * 8)
+#define DMA_SPI_RX_THRESHOLD (3 * 8)
 
 // the SPI bus to use to read audio samples from the ADC
 #define DATA_SPI_BUS (MXC_SPI1)
@@ -46,10 +44,7 @@
 // the DMA channel to use, will be updated to a valid DMA channel during initialization
 static int dma_channel = E_BAD_STATE;
 
-// audio samples from the ADC are dumped here
-static uint8_t dmaDestBuff[AUDIO_DMA_LARGEST_BUFF_LEN_IN_BYTES] = {0};
-
-// the big DMA buff can tolerate a few long SD card writes that go over the available time
+// audio samples from the ADC are dumped here in a modulo fashion, this can tolerate iterations with slow SD write speed
 static uint8_t bigDMAbuff[AUDIO_DMA_BIG_DMA_BUFF_LEN_IN_BYTES] = {0};
 
 // the number of DMA_BUFF_LEN_IN_BYTES length buffers available to read, should usually just be 1, but can be up to
@@ -69,8 +64,6 @@ static const mxc_gpio_cfg_t adc_busy_pin = {
     .func = MXC_GPIO_FUNC_IN,
     .vssel = MXC_GPIO_VSSEL_VDDIO,
 };
-
-static Audio_DMA_Sample_Width_t current_sample_width = AUDIO_DMA_SAMPLE_WIDTH_32_BITS;
 
 /* Private function declarations -------------------------------------------------------------------------------------*/
 
@@ -110,8 +103,8 @@ Audio_DMA_Error_t audio_dma_init()
     mxc_dma_srcdst_t dma_transfer = {
         .ch = dma_channel,
         .source = NULL,
-        .dest = &dmaDestBuff[0],
-        .len = AUDIO_DMA_BUFF_LEN_IN_I24_BYTES,
+        .dest = bigDMAbuff,
+        .len = AUDIO_DMA_BUFF_LEN_IN_BYTES,
     };
 
     mxc_dma_config_t dma_config = {
@@ -165,16 +158,6 @@ Audio_DMA_Error_t audio_dma_init()
     }
 
     return AUDIO_DMA_ERROR_ALL_OK;
-}
-
-void audio_dma_set_sample_width(Audio_DMA_Sample_Width_t sample_width)
-{
-    current_sample_width = sample_width;
-}
-
-Wave_Header_Sample_Rate_t audio_dma_get_sample_width()
-{
-    return current_sample_width;
 }
 
 Audio_DMA_Error_t audio_dma_start()
@@ -232,11 +215,6 @@ uint32_t audio_dma_num_buffers_available()
     return num_buffer_chunks_with_data_to_be_consumed;
 }
 
-uint32_t audio_dma_buffer_size_in_bytes()
-{
-    return AUDIO_DMA_BUFF_LEN_IN_SAMPS * (current_sample_width == AUDIO_DMA_SAMPLE_WIDTH_24_BITS ? 3 : 4);
-}
-
 uint8_t *audio_dma_consume_buffer()
 {
     static uint32_t blockPtrModulo = 0;
@@ -245,7 +223,7 @@ uint8_t *audio_dma_consume_buffer()
     uint8_t *retval = bigDMAbuff + offset;
 
     blockPtrModulo = (blockPtrModulo + 1) & (DMA_NUM_STALLS_ALLOWED - 1);
-    offset = blockPtrModulo * audio_dma_buffer_size_in_bytes();
+    offset = blockPtrModulo * AUDIO_DMA_BUFF_LEN_IN_BYTES;
 
     num_buffer_chunks_with_data_to_be_consumed -= 1;
 
@@ -266,30 +244,29 @@ void audio_dma_clear_overrun()
 
 void DMA0_IRQHandler()
 {
-    // note, the data is sadly in big-endian format (location 0 is an msb) but the wave file is little-endian, so we
-    // need to swap the MSByte and the LSbyte (the middle byte can stay the same)
+    // note, the ADC data is sadly in big-endian format (location 0 is an msb) but the wave file is little-endian, so
+    // we eventually need to swap the MSByte and the LSbyte (the middle byte can stay the same). In this IRQ we just
+    // set the pointer for the next DMA chunk, we don't worry about the endian swap yet. This is because we have a very
+    // short time from the start of this function to the moment the first few bytes are overwritten. If we take too
+    // long messing about in this function we will get invalid data for the first few samples in the buffer. The time
+    // we have is under 1/384kHz = 2.6 microseconds.
 
     static uint32_t blockPtrModuloDMA = 0;
+    static uint32_t offsetDMA = 0;
 
     MXC_DMA_Handler(MXC_DMA0);
     int flags = MXC_DMA_ChannelGetFlags(dma_channel); // clears the cfg enable bit
     MXC_DMA_ChannelClearFlags(dma_channel, flags);
 
-    static uint32_t offsetDMA = 0;
-
-    // switch endian-ness while copying into the big DMA buffer
-
-    if (current_sample_width == AUDIO_DMA_SAMPLE_WIDTH_24_BITS)
-    {
-        data_converters_i24_swap_endianness(dmaDestBuff, bigDMAbuff + offsetDMA, audio_dma_buffer_size_in_bytes());
-    }
-    else // it must be 32 bit wide samples
-    {
-        data_converters_i24_to_q31_with_endian_swap(dmaDestBuff, (q31_t *)(bigDMAbuff + offsetDMA), audio_dma_buffer_size_in_bytes());
-    }
-
     blockPtrModuloDMA = (blockPtrModuloDMA + 1) & (DMA_NUM_STALLS_ALLOWED - 1);
-    offsetDMA = blockPtrModuloDMA * audio_dma_buffer_size_in_bytes();
+    offsetDMA = blockPtrModuloDMA * AUDIO_DMA_BUFF_LEN_IN_BYTES;
+
+    const uint32_t next_chunk = bigDMAbuff + offsetDMA;
+
+    MXC_DMA0->ch[dma_channel].dst = next_chunk;
+    MXC_DMA0->ch[dma_channel].dst_rld = next_chunk;
+    MXC_DMA0->ch[dma_channel].cnt = AUDIO_DMA_BUFF_LEN_IN_BYTES;
+    MXC_DMA0->ch[dma_channel].cnt_rld |= MXC_F_DMA_CNT_RLD_RLDEN;
 
     num_buffer_chunks_with_data_to_be_consumed += 1;
 
@@ -297,10 +274,4 @@ void DMA0_IRQHandler()
     {
         overrun_occured = true;
     }
-
-    // get ready for next dma transfer
-
-    // enable dma and reload bits
-    MXC_DMA0->ch[dma_channel].cfg |= (MXC_F_DMA_CFG_RLDEN | MXC_F_DMA_CFG_CHEN);
-    MXC_DMA0->ch[dma_channel].cnt_rld |= MXC_F_DMA_CNT_RLD_RLDEN;
 }

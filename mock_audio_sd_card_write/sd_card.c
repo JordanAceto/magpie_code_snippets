@@ -27,6 +27,17 @@ static char volume = '0';
 
 SD_Card_Error_t sd_card_init()
 {
+    // needed for FTHR2
+    const mxc_gpio_cfg_t sd_card_en_pin = {
+        .port = MXC_GPIO1,
+        .mask = MXC_GPIO_PIN_6,
+        .pad = MXC_GPIO_PAD_NONE,
+        .func = MXC_GPIO_FUNC_OUT,
+        .vssel = MXC_GPIO_VSSEL_VDDIOH,
+    };
+    MXC_GPIO_Config(&sd_card_en_pin);
+    MXC_GPIO_OutClr(sd_card_en_pin.port, sd_card_en_pin.mask);
+
     const mxc_sdhc_cfg_t sdhc_cfg = {
         .bus_voltage = MXC_SDHC_Bus_Voltage_3_3,
         .block_gap = SDHC_CONFIG_BLOCK_GAP,
@@ -37,6 +48,10 @@ SD_Card_Error_t sd_card_init()
     {
         return SD_CARD_INIT_ERROR;
     }
+
+    // needed for FTHR2
+    MXC_GPIO_Config(&sd_card_en_pin);
+    MXC_GPIO_OutClr(sd_card_en_pin.port, sd_card_en_pin.mask);
 
     // without a delay here the next function was consistently returning an error
     MXC_Delay(10000);

@@ -19,7 +19,7 @@
 #define DEMO_CONFIG_SINE_FREQUENCY_HZ (1000)
 
 // the length of the WAVE file to write to the SD card, a positive integer, long file durations will tale a long time to write
-#define DEMO_CONFIG_AUDIO_FILE_LENGTH_MINUTES (10)
+#define DEMO_CONFIG_AUDIO_FILE_LENGTH_MINUTES (1)
 
 // the length of the audio buffer in samples, not in bytes, a positive integer
 #define DEMO_CONFIG_AUDIO_BUFF_LEN_IN_SAMPS (8256)

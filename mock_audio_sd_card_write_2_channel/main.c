@@ -28,7 +28,8 @@
 
 #define AUDIO_FILE_LENGTH_MILLISECONDS (DEMO_CONFIG_AUDIO_FILE_LENGTH_MINUTES * 60 * 1000)
 
-#define NUM_FULL_BUFFERS_IN_WHOLE_FILE (AUDIO_FILE_LENGTH_MILLISECONDS / AUDIO_BUFF_DURATION_MILLISECONDS)
+// x2 is because this demo writes 2 channels
+#define NUM_FULL_BUFFERS_IN_WHOLE_FILE ((AUDIO_FILE_LENGTH_MILLISECONDS / AUDIO_BUFF_DURATION_MILLISECONDS) * 2)
 
 /* Types -------------------------------------------------------------------------------------------------------------*/
 

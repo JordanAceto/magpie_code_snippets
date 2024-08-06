@@ -18,7 +18,8 @@ A few parameters for the demo can be configured by altering the definitions in `
 ## Required Connections
 
 - Insert an SD card which has previously been formatted to exFAT or FAT32 format into the FTHR SD card slot.
-- Do not plug the FTHR into the Motherboard header, this demo just requires the FTHR on its own. 
+- The FTHR may be plugged into the Motherboard header, but it is not required. This demo can also be run on a bare FTHR with no custom Motherboard.
+- Either the original FTHR or FTHR2 can be used.
 
 ## Expected Output
 

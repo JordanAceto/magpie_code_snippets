@@ -51,7 +51,8 @@ typedef enum
 typedef enum
 {
     AFE_CONTROL_ERROR_ALL_OK = 0,
-    AFE_CONTROL_ERROR_I2C_ERROR
+    AFE_CONTROL_ERROR_I2C_ERROR,
+    AFE_CONTROL_ERROR_CHANNEL_NOT_ENABLED_ERROR,
 } AFE_Control_Error_t;
 
 /* Public function declarations --------------------------------------------------------------------------------------*/
@@ -88,6 +89,15 @@ void afe_control_enable(AFE_Control_Channel_t channel);
  * @post the given channel is powered off.
  */
 void afe_control_disable(AFE_Control_Channel_t channel);
+
+/**
+ * @brief `afe_control_channel_is_enabled(c)` is true iff AFE channel `c` is enabled.
+ *
+ * @param channel the channel to check
+ *
+ * @retval true if the given channel is enabled, else false
+ */
+bool afe_control_channel_is_enabled(AFE_Control_Channel_t channel);
 
 /**
  * @brief `afe_control_set_gain(c, g)` sets the gain of the AFE channel `c` to enumerated gain setting `g`

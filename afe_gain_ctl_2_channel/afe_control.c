@@ -80,8 +80,26 @@ void afe_control_disable(AFE_Control_Channel_t channel)
     }
 }
 
+bool afe_control_channel_is_enabled(AFE_Control_Channel_t channel)
+{
+    switch (channel)
+    {
+    case AFE_CONTROL_CHANNEL_0:
+        return MXC_GPIO_InGet(afe_ch0_enable_pin.port, afe_ch0_enable_pin.mask);
+    case AFE_CONTROL_CHANNEL_1:
+        return MXC_GPIO_InGet(afe_ch1_enable_pin.port, afe_ch1_enable_pin.mask);
+    default:
+        return false;
+    }
+}
+
 AFE_Control_Error_t afe_control_set_gain(AFE_Control_Channel_t channel, AFE_Control_Gain_t gain)
 {
+    if (!afe_control_channel_is_enabled(channel))
+    {
+        return AFE_CONTROL_ERROR_CHANNEL_NOT_ENABLED_ERROR;
+    }
+
     // the format for writing is [addr, dummy, data]
     tx_buff[0] = MAX14662_DUMMY_REGISTER;
     tx_buff[1] = gain;
@@ -104,6 +122,11 @@ AFE_Control_Error_t afe_control_set_gain(AFE_Control_Channel_t channel, AFE_Cont
 
 AFE_Control_Gain_t afe_control_get_gain(AFE_Control_Channel_t channel)
 {
+    if (!afe_control_channel_is_enabled(channel))
+    {
+        return AFE_CONTROL_GAIN_UNDEFINED;
+    }
+
     mxc_i2c_req_t req = {
         .i2c = hi2c_,
         .addr = channel,
